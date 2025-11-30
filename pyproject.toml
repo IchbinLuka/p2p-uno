@@ -1,0 +1,21 @@
+[project]
+name = "p2p-uno"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Luka Born", email = "luka.born.2003@gmail.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.123.0",
+    "sqlalchemy>=2.0.44",
+    "uvicorn>=0.38.0",
+]
+
+# [project.scripts]
+# p2p-uno = "p2p_uno:__main__:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
