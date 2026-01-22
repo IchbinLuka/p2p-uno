@@ -1,0 +1,33 @@
+name: vitest
+
+on:
+  push:
+    branches:
+      - "*"
+
+env:
+  node_version: '24.11.1'
+
+jobs:
+  frontend-unit-tests:
+    name: Backend unit tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.node_version }}
+          cache: npm
+          cache-dependency-path: src/p2p_uno/frontend/package-lock.json
+
+      - name: Go to project dir
+        run: cd src/p2p_uno/frontend
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm run test
