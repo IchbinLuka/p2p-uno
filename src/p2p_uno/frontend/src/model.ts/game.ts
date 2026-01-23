@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import {
     MessageType,
     type ConnectionManager,
@@ -7,33 +6,11 @@ import {
     type PlayCard,
     type SignCardMessage,
 } from "./connection";
+import { InvalidAction, InvalidSignature, PlayerError } from "./errors";
 import type { SignManager } from "./signing";
 import type { Card, CardType, KnownCard, Player, UnknownCard } from "./types";
 
 const INITIAL_CARD_COUNT = 7;
-
-export abstract class PlayerError {
-    player: string;
-
-    constructor(player: string) {
-        this.player = player;
-    }
-}
-
-class InvalidAction extends PlayerError {
-    message: string;
-
-    constructor(message: string, player: string) {
-        super(player);
-        this.message = message;
-    }
-
-    toString(): string {
-        return `Invalid Action: ${this.message}`;
-    }
-}
-
-class InvalidSignature extends PlayerError {}
 
 class DrawingCard {
     current_card: Card;
@@ -71,7 +48,7 @@ interface GameResult {
  * Class which manages the game flow. This class essentially acts a bit like a server
  * and does not differentiate between the own player and other players.
  */
-class GameManager {
+export class GameManager {
     private sign_manager: SignManager;
     private current_phase: GamePhase;
     private players: { [key: string]: Player };
@@ -85,9 +62,10 @@ class GameManager {
         player_order: string[],
         connection_manager: ConnectionManager,
         on_violation: (violation: PlayerError) => void,
+        players: { [key: string]: Player },
     ) {
         this.sign_manager = sign_manager;
-        this.players = {}; // TODO
+        this.players = players;
         this.current_phase = new WaitingPlay(0);
         this.player_order = player_order;
         this.connection_manager = connection_manager;

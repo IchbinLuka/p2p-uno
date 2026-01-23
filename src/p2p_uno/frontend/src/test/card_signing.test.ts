@@ -23,5 +23,7 @@ describe("signing & verifying card", () => {
         const card = manager1.sampleCard();
         const signed = await manager2.signCard(card, "bob");
         expect.assert(manager1.verifyCard(signed, players));
+        // const revealed = await manager2.
+        // manager1.verifyKnownCard()
     });
 });

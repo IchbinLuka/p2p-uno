@@ -1,3 +1,5 @@
+import type { MessageData, PlayerMessage } from "./connection";
+import { serialize_message } from "./serialization";
 import type { Card, KnownCard, Player } from "./types";
 
 export class SignManager {
@@ -137,5 +139,59 @@ export class SignManager {
         return actualHashArray.every(
             (val, index) => val === expectedHash[index],
         );
+    }
+
+    async signMessage(
+        message: MessageData,
+        own_name: string,
+    ): Promise<PlayerMessage> {
+        const payloadToSign = new TextEncoder().encode(
+            serialize_message(message),
+        );
+
+        const signature = await window.crypto.subtle.sign(
+            {
+                name: "ECDSA",
+                hash: { name: "SHA-256" },
+            },
+            this.keyPair.privateKey,
+            payloadToSign.buffer as ArrayBuffer,
+        );
+        return {
+            player: own_name,
+            signature: new Uint8Array(signature),
+            payload: message,
+        };
+    }
+
+    async verifyMessage(
+        message: PlayerMessage,
+        players: { [key: string]: Player | undefined },
+    ): Promise<boolean> {
+        const player = message.player;
+        const key = players[player]?.public_key;
+        if (key == null) return false;
+
+        const payload = new TextEncoder().encode(serialize_message(message));
+
+        const publicKey = await window.crypto.subtle.importKey(
+            "raw",
+            key.buffer as ArrayBuffer,
+            { name: "ECDSA", namedCurve: "P-256" },
+            true,
+            ["verify"],
+        );
+
+        const isValid = await window.crypto.subtle.verify(
+            {
+                name: "ECDSA",
+                hash: { name: "SHA-256" },
+            },
+            publicKey,
+            message.signature.buffer as ArrayBuffer,
+            payload.buffer as ArrayBuffer,
+        );
+
+        return isValid;
     }
 }
