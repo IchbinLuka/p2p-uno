@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { SignManager } from "../model.ts/signing";
-import type { Player } from "../model.ts/types";
+import { SignManager } from "../model/signing";
+import type { Player } from "../model/types";
 
 describe("signing & verifying card", () => {
     it("", async () => {

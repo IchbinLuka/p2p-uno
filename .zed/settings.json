@@ -1,0 +1,49 @@
+// Folder-specific settings
+//
+// For a full list of overridable settings, and general information on folder-specific settings,
+// see the documentation: https://zed.dev/docs/configuring-zed#settings-files
+{
+    "remove_trailing_whitespace_on_save": true,
+    "tab_size": 4,
+    "languages": {
+        "Python": {
+            "language_servers": ["basedpyright", "ruff"],
+            "format_on_save": "on",
+            "formatter": [
+                {
+                    "language_server": {
+                        "name": "ruff",
+                    },
+                },
+                { "code_action": "source.organizeImports.ruff" },
+            ],
+        },
+    },
+    "lsp": {
+        // "ruff": {
+        //     "initialization_options": {
+        //         "settings": {
+        //             "lint": {
+        //                 "enable": true,
+        //             },
+        //             "lineLength": 120,
+        //             "codeAction": {
+        //                 "disableRuleComment": {
+        //                     "enable": false,
+        //                 },
+        //                 "fixViolation": {
+        //                     "enable": false,
+        //                 },
+        //             },
+        //         },
+        //     },
+        // },
+        "basedpyright": {
+            "settings": {
+                "python.analysis": {
+                    "diagnosticMode": "workspace",
+                },
+            },
+        },
+    },
+}

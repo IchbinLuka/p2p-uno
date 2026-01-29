@@ -3,14 +3,14 @@ import { describe, it, expect } from "vitest";
 import {
     deserialize_message,
     serialize_message,
-} from "../model.ts/serialization";
-import { SignManager } from "../model.ts/signing";
-import type { Player } from "../model.ts/types";
+} from "../model/serialization";
+import { SignManager } from "../model/signing";
+import type { Player } from "../model/types";
 import {
     MessageType,
     type DrawCardRequest,
     type MessageData,
-} from "../model.ts/connection";
+} from "../model/connection";
 
 describe("Test serialization + deserialization of messages", () => {
     it("serialization & deserialization", () => {

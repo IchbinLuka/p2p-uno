@@ -164,6 +164,22 @@ export class SignManager {
         };
     }
 
+    async signPayload(payload: Uint8Array): Promise<Uint8Array> {
+        const payloadToSign = new TextEncoder().encode(
+            serialize_message(payload),
+        );
+
+        const signature = await window.crypto.subtle.sign(
+            {
+                name: "ECDSA",
+                hash: { name: "SHA-256" },
+            },
+            this.keyPair.privateKey,
+            payloadToSign.buffer as ArrayBuffer,
+        );
+        return new Uint8Array(signature);
+    }
+
     async verifyMessage(
         message: PlayerMessage,
         players: { [key: string]: Player | undefined },

@@ -8,8 +8,10 @@ authors = [
 ]
 requires-python = ">=3.13"
 dependencies = [
+    "ecdsa>=0.19.1",
     "fastapi>=0.123.0",
     "httpx>=0.28.1",
+    "pycryptodome>=3.23.0",
     "pytest>=9.0.1",
     "sqlalchemy>=2.0.44",
     "uvicorn>=0.38.0",

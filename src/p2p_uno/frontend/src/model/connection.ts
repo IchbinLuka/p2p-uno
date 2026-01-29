@@ -18,13 +18,6 @@ export class UnexpectedMessageType extends PlayerError {
     }
 }
 
-export type Message =
-    | SignCardMessage
-    | DrawCardRequest
-    | FinalizeCardDraw
-    | PlayCard
-    | KickVote;
-
 export enum MessageType {
     SIGN_CARD = "sign_card",
     DRAW_CARD_REQUEST = "draw_card_request",
@@ -33,30 +26,38 @@ export enum MessageType {
     KICK_VOTE = "kick_vote",
 }
 
+export type Message =
+    | SignCardMessage
+    | DrawCardRequest
+    | FinalizeCardDraw
+    | PlayCard
+    | KickVote;
+
 export interface SignCardMessage {
+    // Fixing an enum variant here allows for smart casting
+    type: MessageType.SIGN_CARD;
     card_nonce: Uint8Array;
     signature: Uint8Array;
 }
 
 export interface DrawCardRequest {
+    type: MessageType.DRAW_CARD_REQUEST;
     initial_card: Card;
 }
 
 export interface FinalizeCardDraw {
+    type: MessageType.FINALIZE_CARD_DRAW;
     card_hash: Uint8Array;
 }
 
 export interface PlayCard {
+    type: MessageType.PLAY_CARD;
     card_hash: Uint8Array;
     card: KnownCard;
 }
 
-export interface MessageData {
-    type: MessageType;
-    message: Message;
-}
-
 export interface KickVote {
+    type: MessageType.KICK_VOTE;
     player: string;
     reason: string;
 }
@@ -68,14 +69,14 @@ export type KickListener = (
 ) => void;
 
 export interface ConnectionManager {
-    await_message(player: Player, types: MessageType[]): Promise<MessageData>;
+    await_message(player: Player, types: MessageType[]): Promise<Message>;
     add_kick_vote_listener(listener: KickListener): void;
 }
 
 export interface PlayerMessage {
     player: string;
     signature: Uint8Array;
-    payload: MessageData;
+    payload: Message;
 }
 
 interface PlayerConnection {
@@ -149,7 +150,7 @@ export class ConnectionManagerImpl implements ConnectionManager {
         this.router.add_listener((msg) => {
             if (msg.payload.type == MessageType.KICK_VOTE) {
                 for (const listener of this.kick_listeners) {
-                    const vote = msg.payload.message as KickVote;
+                    const vote = msg.payload;
                     listener(vote.reason, msg.player, vote.player);
                 }
                 return true;
@@ -158,7 +159,7 @@ export class ConnectionManagerImpl implements ConnectionManager {
         });
     }
 
-    await_message(player: Player, types: MessageType[]): Promise<MessageData> {
+    await_message(player: Player, types: MessageType[]): Promise<Message> {
         return new Promise((resolve, reject) => {
             const callback = (msg: PlayerMessage) => {
                 if (msg.player !== player.name) return false;
