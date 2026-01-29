@@ -8,10 +8,20 @@ enum IceType {
     SignRequest = "sign_request",
 }
 
+type WebsocketMessage = LobbyEnd | IncomingIce;
+
+interface LobbyEnd {
+    verified_players: {
+        [key: string]: string;
+    };
+    type: "lobbyend";
+}
+
 interface IncomingIce {
     sender: string;
     data: object;
     ice_type: IceType;
+    type: "ice";
 }
 
 interface OutgoingIce {
@@ -37,6 +47,7 @@ interface SignResponse {
     type: SignMessageType.RESPONSE;
     nonce: string;
     signature: string;
+    key: string;
 }
 
 interface ChallengeProof {
@@ -50,17 +61,28 @@ interface JoinMessage {
 }
 
 interface SessionInfoMessage {
-    ga;
     player_keys: { [key: string]: string };
     challenge_nonce: string;
 }
+
+export interface PlayerConnection {
+    name: string;
+    data_channel: RTCDataChannel;
+    connection: RTCPeerConnection;
+    public_key: Uint8Array;
+}
+
+export interface ConnectionResult {
+    players: PlayerConnection[];
+}
+
 const HOST = "localhost:8080";
 
 export async function establish_connections(
     name: string,
     session_id: string,
     sign_manager: SignManager,
-) {
+): Promise<ConnectionResult> {
     const websocket = new WebSocket(`ws://${HOST}/sessions/${session_id}`);
     // Wait until websocket is open
     await new Promise<void>((resolve, reject) => {
@@ -84,8 +106,9 @@ export async function establish_connections(
 
     const player_connections: { [key: string]: RTCPeerConnection } = {};
     const player_channels: { [key: string]: RTCDataChannel } = {};
+    const player_keys: { [key: string]: Uint8Array } = {};
 
-    const proof = await new Promise<ChallengeProof>((resolve) => {
+    const lobby_end = await new Promise<LobbyEnd>((resolve) => {
         const player_proofs: { [key: string]: string } = {};
         const create_connection = (p: string) => {
             const connection = new RTCPeerConnection();
@@ -109,31 +132,37 @@ export async function establish_connections(
                             type: SignMessageType.RESPONSE,
                             signature: uint8_to_b64(signature),
                             nonce: request.nonce,
+                            key: uint8_to_b64(sign_manager.publicKeyExported),
                         };
                         player_channels[p].send(JSON.stringify(message));
-                    } else {
+                    } else if (p in session_info.player_keys) {
+                        // If the player is not in player keys, we do not need a proof
                         if (request.nonce !== session_info.challenge_nonce) {
                             // We got the wrong message
                             throw new Error("Invalid nonce");
                         }
                         player_proofs[p] = request.signature;
+                        player_keys[p] = b64_to_uint8(request.key);
+                        // Check if we have collected all required proofs
                         if (
                             Object.keys(player_proofs).length ==
                             Object.keys(session_info.player_keys.length).length
                         ) {
-                            resolve({
-                                type: "proof",
-                                player_payloads: player_proofs,
-                            });
+                            websocket.send(
+                                JSON.stringify({
+                                    type: "proof",
+                                    player_payloads: player_proofs,
+                                } satisfies ChallengeProof),
+                            );
                         }
                     }
-                };
+                }; // on_message
                 const message: SignRequest = {
                     nonce: session_info.challenge_nonce,
                     type: SignMessageType.REQUEST,
                 };
                 event.channel.send(JSON.stringify(message));
-            };
+            }; // on_datachannel
             return connection;
         };
 
@@ -155,7 +184,13 @@ export async function establish_connections(
 
         const pending_ice: { [key: string]: RTCIceCandidate[] } = {};
         websocket.onmessage = async (msg) => {
-            const parsed: IncomingIce = JSON.parse(msg.data);
+            const parsed: WebsocketMessage = JSON.parse(msg.data);
+
+            if (parsed.type === "lobbyend") {
+                resolve(parsed);
+                return;
+            }
+
             const connection = player_connections[parsed.sender];
 
             switch (parsed.ice_type) {
@@ -201,8 +236,22 @@ export async function establish_connections(
                     }
                     break;
                 }
-            }
-        };
+            } // switch
+        }; // on_message
     });
-    websocket.send(JSON.stringify(proof));
+
+    const result: PlayerConnection[] = [];
+
+    for (const [player, key] of Object.entries(lobby_end.verified_players)) {
+        result.push({
+            name: player,
+            data_channel: player_channels[key],
+            connection: player_connections[key],
+            public_key: b64_to_uint8(key),
+        });
+    }
+
+    return {
+        players: result,
+    };
 }

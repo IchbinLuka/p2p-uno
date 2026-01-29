@@ -1,4 +1,4 @@
-import type { MessageData, PlayerMessage } from "./connection";
+import type { Message, PlayerMessage } from "./connection";
 import { serialize_message } from "./serialization";
 import type { Card, KnownCard, Player } from "./types";
 
@@ -142,7 +142,7 @@ export class SignManager {
     }
 
     async signMessage(
-        message: MessageData,
+        message: Message,
         own_name: string,
     ): Promise<PlayerMessage> {
         const payloadToSign = new TextEncoder().encode(
