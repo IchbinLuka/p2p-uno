@@ -88,8 +88,7 @@ export class GameManager {
                     this.players[player],
                     [MessageType.DRAW_CARD_REQUEST],
                 );
-                const initial = (request.message as DrawCardRequest)
-                    .initial_card;
+                const initial = (request as DrawCardRequest).initial_card;
                 await this.handle_draw_card(p, initial);
             }
         }
@@ -145,7 +144,7 @@ export class GameManager {
                 current_player,
                 [MessageType.SIGN_CARD],
             );
-            const signature = (message.message as SignCardMessage).signature;
+            const signature = (message as SignCardMessage).signature;
             card.signatures.push({
                 signature,
                 author: current_player.name,
@@ -160,7 +159,7 @@ export class GameManager {
             player,
             [MessageType.FINALIZE_CARD_DRAW],
         );
-        const hash = (finalization.message as FinalizeCardDraw).card_hash;
+        const hash = (finalization as FinalizeCardDraw).card_hash;
         const final_card: UnknownCard = {
             hash,
             ...card,
@@ -191,12 +190,12 @@ export class GameManager {
                 if (message.type == MessageType.PLAY_CARD) {
                     this.handle_play_card(
                         current_player,
-                        (message.message as PlayCard).card,
+                        (message as PlayCard).card,
                     );
                 } else if (message.type == MessageType.DRAW_CARD_REQUEST) {
                     this.handle_draw_card(
                         current_player_idx,
-                        (message.message as DrawCardRequest).initial_card,
+                        (message as DrawCardRequest).initial_card,
                     );
                 }
             } catch (e) {

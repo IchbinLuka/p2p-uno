@@ -1,35 +1,69 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { useId, useState, type SubmitEvent } from "react";
+import "./App.css";
+import { create_session } from "./model/ice_messaging";
+import { GameModel } from "./model/model";
 
 function App() {
-  const [count, setCount] = useState(0)
+    const join_button = useId();
+    const [_, set_state] = useState<GameModel | null>(null);
 
-  return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    async function handleSubmit(e: SubmitEvent) {
+        e.preventDefault();
+        const form = e.target;
+        const create_new_checkbox = form.elements.namedItem(
+            "create_new",
+        ) as HTMLInputElement;
+        const create_new = create_new_checkbox.checked;
+
+        const session_input = form.elements.namedItem(
+            "session_id",
+        ) as HTMLInputElement;
+        let session_id = session_input.value;
+
+        const player_input = form.elements.namedItem(
+            "player_name",
+        ) as HTMLInputElement;
+        const player_name = player_input.value;
+
+        if (create_new) {
+            session_id = await create_session();
+        }
+        const model = await GameModel.create();
+
+        set_state(model);
+
+        console.debug("Connecting to session");
+        const info = await model.join_session(player_name, session_id);
+        console.debug(`Connected: ${info}`);
+    }
+
+    return (
+        <>
+            <form onSubmit={handleSubmit}>
+                <div>
+                    <label>
+                        Session id:
+                        <input name="session_id"></input>
+                    </label>
+                </div>
+                <div>
+                    <label>
+                        Player name:
+                        <input name="player_name"></input>
+                    </label>
+                </div>
+                <div>
+                    <button id={join_button}>Create/Join Session</button>
+                </div>
+                <div>
+                    <label>
+                        Create new:{" "}
+                        <input name="create_new" type="checkbox"></input>
+                    </label>
+                </div>
+            </form>
+        </>
+    );
 }
 
-export default App
+export default App;

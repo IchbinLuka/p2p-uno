@@ -8,6 +8,7 @@ authors = [
 ]
 requires-python = ">=3.13"
 dependencies = [
+    "cryptography>=46.0.4",
     "ecdsa>=0.19.1",
     "fastapi>=0.123.0",
     "httpx>=0.28.1",
@@ -15,10 +16,11 @@ dependencies = [
     "pytest>=9.0.1",
     "sqlalchemy>=2.0.44",
     "uvicorn>=0.38.0",
+    "websockets>=16.0",
 ]
 
-# [project.scripts]
-# p2p-uno = "p2p_uno:__main__:main"
+[project.scripts]
+p2p-uno = "p2p_uno.__main__:main"
 
 [build-system]
 requires = ["hatchling"]
