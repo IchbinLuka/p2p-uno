@@ -2,10 +2,10 @@ import type { Message, PlayerMessage } from "./connection";
 import { serialize_message } from "./serialization";
 import type { Card, KnownCard, Player } from "./types";
 
-const ALGORITHM_NAME = "ECDSA";
 const ALGORITHM_PARAMS = {
     name: "ECDSA",
     namedCurve: "P-256",
+    hash: { name: "SHA-256" },
 };
 
 export class SignManager {
@@ -91,7 +91,7 @@ export class SignManager {
             const publicKey = await window.crypto.subtle.importKey(
                 "raw",
                 publicKeyRaw.buffer as ArrayBuffer,
-                { name: ALGORITHM_NAME, namedCurve: "P-256" },
+                ALGORITHM_PARAMS,
                 true,
                 ["verify"],
             );
@@ -158,15 +158,8 @@ export class SignManager {
     }
 
     async signPayload(payload: Uint8Array): Promise<Uint8Array> {
-        // const payloadToSign = new TextEncoder().encode(
-        //     serialize_message(payload),
-        // );
-
         const signature = await window.crypto.subtle.sign(
-            {
-                name: ALGORITHM_NAME,
-                hash: { name: "SHA-256" },
-            },
+            ALGORITHM_PARAMS,
             this.keyPair.privateKey,
             payload.buffer as ArrayBuffer,
         );
