@@ -7,7 +7,7 @@ function App() {
     const join_button = useId();
     const [_, set_state] = useState<GameModel | null>(null);
 
-    async function handleSubmit(e: SubmitEvent) {
+    function handleSubmit(e: SubmitEvent) {
         e.preventDefault();
         const form = e.target;
         const create_new_checkbox = form.elements.namedItem(
@@ -25,16 +25,18 @@ function App() {
         ) as HTMLInputElement;
         const player_name = player_input.value;
 
-        if (create_new) {
-            session_id = await create_session();
-        }
-        const model = await GameModel.create();
+        void (async () => {
+            if (create_new) {
+                session_id = await create_session();
+            }
+            const model = await GameModel.create();
 
-        set_state(model);
+            set_state(model);
 
-        console.debug("Connecting to session");
-        const info = await model.join_session(player_name, session_id);
-        console.debug(`Connected: ${info}`);
+            console.debug("Connecting to session");
+            const info = await model.join_session(player_name, session_id);
+            console.debug(`Connected: ${JSON.stringify(info)}`);
+        })();
     }
 
     return (

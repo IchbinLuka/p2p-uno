@@ -148,7 +148,7 @@ export class SignManager {
         const signature = await window.crypto.subtle.sign(
             ALGORITHM_PARAMS,
             this.keyPair.privateKey,
-            payloadToSign.buffer as ArrayBuffer,
+            payloadToSign.buffer,
         );
         return {
             player: own_name,
@@ -188,7 +188,7 @@ export class SignManager {
             ALGORITHM_PARAMS,
             publicKey,
             message.signature.buffer as ArrayBuffer,
-            payload.buffer as ArrayBuffer,
+            payload.buffer,
         );
 
         return isValid;

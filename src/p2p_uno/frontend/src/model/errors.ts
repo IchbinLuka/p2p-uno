@@ -1,7 +1,8 @@
-export abstract class PlayerError {
+export abstract class PlayerError extends Error {
     player: string;
 
     constructor(player: string) {
+        super();
         this.player = player;
     }
 }

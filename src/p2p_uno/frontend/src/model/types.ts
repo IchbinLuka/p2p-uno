@@ -1,6 +1,5 @@
 export interface Player {
     name: string;
-    // The key should be derived from the initial nonce of the card
     cards: { [key: string]: UnknownCard };
     public_key: Uint8Array;
 }

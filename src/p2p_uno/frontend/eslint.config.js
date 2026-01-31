@@ -11,11 +11,15 @@ export default defineConfig([
         files: ["**/*.{ts,tsx}"],
         extends: [
             js.configs.recommended,
-            tseslint.configs.recommended,
+            tseslint.configs.recommendedTypeChecked,
             reactHooks.configs.flat.recommended,
             reactRefresh.configs.vite,
         ],
         languageOptions: {
+            // parser: "@typescript-eslint/parser",
+            parserOptions: {
+                projectService: true,
+            },
             ecmaVersion: 2020,
             globals: globals.browser,
         },
@@ -32,6 +36,7 @@ export default defineConfig([
                     ignoreRestSiblings: true,
                 },
             ],
+            "@typescript-eslint/switch-exhaustiveness-check": "warn",
         },
     },
 ]);

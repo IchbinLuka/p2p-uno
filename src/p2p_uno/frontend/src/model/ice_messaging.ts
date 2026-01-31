@@ -5,7 +5,6 @@ enum IceType {
     Candidate = "candidate",
     Answer = "answer",
     Offer = "offer",
-    SignRequest = "sign_request",
 }
 
 type WebsocketMessage = LobbyEnd | IncomingIce;
@@ -77,13 +76,32 @@ export interface ConnectionResult {
     players: PlayerConnection[];
 }
 
+interface SessionCreateResponse {
+    session_id: string;
+}
+
+class WebsocketError extends Error {
+    event: Event;
+    constructor(event: Event) {
+        super();
+        this.event = event;
+    }
+
+    toString() {
+        // eslint-disable-next-line @typescript-eslint/no-base-to-string
+        return `WebsocketError: ${this.event.toString()}`;
+    }
+}
+
 const HOST = "localhost:8000";
 
-export async function create_session() {
+export async function create_session(): Promise<string> {
     const response = await window.fetch(`http://${HOST}/sessions`, {
         method: "POST",
     });
-    const { session_id } = JSON.parse(await response.text());
+    const { session_id } = JSON.parse(
+        await response.text(),
+    ) as SessionCreateResponse;
     return session_id;
 }
 
@@ -96,7 +114,7 @@ export async function establish_connections(
     // Wait until websocket is open
     await new Promise<void>((resolve, reject) => {
         websocket.onopen = () => resolve();
-        websocket.onerror = (err) => reject(err);
+        websocket.onerror = (err) => reject(new WebsocketError(err));
     });
 
     const join_message: JoinMessage = {
@@ -106,8 +124,9 @@ export async function establish_connections(
     websocket.send(JSON.stringify(join_message));
     const session_info: SessionInfoMessage = await new Promise(
         (resolve, reject) => {
-            websocket.onmessage = (msg) => resolve(JSON.parse(msg.data));
-            websocket.onerror = (err) => reject(err);
+            websocket.onmessage = (msg) =>
+                resolve(JSON.parse(msg.data as string) as SessionInfoMessage);
+            websocket.onerror = (event) => reject(new WebsocketError(event));
         },
     );
     console.debug("Received session info:", session_info);
@@ -123,8 +142,10 @@ export async function establish_connections(
         console.log("Data channel created");
         player_channels[p] = channel;
         channel.onmessage = async (msg) => {
-            console.log(`Received message from player ${p}: ${msg}`);
-            const request: SignMessage = JSON.parse(msg.data);
+            console.log(`Received message from player ${p}: ${msg.data}`);
+            const request: SignMessage = JSON.parse(
+                msg.data as string,
+            ) as SignMessage;
             if (request.type == SignMessageType.REQUEST) {
                 const signature = await sign_manager.signPayload(
                     b64_to_uint8(request.nonce),
@@ -207,20 +228,27 @@ export async function establish_connections(
             const data_channel =
                 connection.createDataChannel("game_communication");
             handle_data_channel(data_channel, player);
-            connection.createOffer().then((offer) => {
-                connection.setLocalDescription(offer);
-                send_ice({
-                    type: "ice",
-                    recipient: player,
-                    payload: offer,
-                    ice_type: IceType.Offer,
+            connection
+                .createOffer()
+                .then(async (offer) => {
+                    await connection.setLocalDescription(offer);
+                    send_ice({
+                        type: "ice",
+                        recipient: player,
+                        payload: offer,
+                        ice_type: IceType.Offer,
+                    });
+                })
+                .catch((error) => {
+                    console.error(
+                        `Error creating offer for ${player}: ${error}`,
+                    );
                 });
-            });
         }
 
         const pending_ice: { [key: string]: RTCIceCandidate[] } = {};
         websocket.onmessage = async (msg) => {
-            const parsed: WebsocketMessage = JSON.parse(msg.data);
+            const parsed = JSON.parse(msg.data as string) as WebsocketMessage;
 
             console.log(`Received message: ${JSON.stringify(parsed)}`);
 
@@ -233,7 +261,7 @@ export async function establish_connections(
 
             switch (parsed.ice_type) {
                 case IceType.Answer:
-                    connection.setRemoteDescription(
+                    await connection.setRemoteDescription(
                         parsed.payload as RTCSessionDescriptionInit,
                     );
                     break;
@@ -246,7 +274,7 @@ export async function establish_connections(
                             parsed.payload as RTCIceCandidate,
                         );
                     }
-                    connection.addIceCandidate(parsed.payload);
+                    await connection.addIceCandidate(parsed.payload);
                     break;
                 case IceType.Offer: {
                     if (parsed.sender in player_connections) {
@@ -256,12 +284,14 @@ export async function establish_connections(
                     player_connections[parsed.sender] = create_connection(
                         parsed.sender,
                     );
-                    player_connections[parsed.sender].setRemoteDescription(
+                    await player_connections[
+                        parsed.sender
+                    ].setRemoteDescription(
                         parsed.payload as RTCSessionDescriptionInit,
                     );
                     const answer =
                         await player_connections[parsed.sender].createAnswer();
-                    player_connections[parsed.sender].setLocalDescription(
+                    await player_connections[parsed.sender].setLocalDescription(
                         answer,
                     );
                     send_ice({
@@ -272,9 +302,9 @@ export async function establish_connections(
                     });
                     if (parsed.sender in pending_ice) {
                         for (const candidate of pending_ice[parsed.sender]) {
-                            player_connections[parsed.sender].addIceCandidate(
-                                candidate,
-                            );
+                            await player_connections[
+                                parsed.sender
+                            ].addIceCandidate(candidate);
                         }
                         delete pending_ice[parsed.sender];
                     }

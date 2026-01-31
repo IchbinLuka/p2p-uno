@@ -3,7 +3,6 @@ import {
     type ConnectionManager,
     type DrawCardRequest,
     type FinalizeCardDraw,
-    type PlayCard,
     type SignCardMessage,
 } from "./connection";
 import { InvalidAction, InvalidSignature, PlayerError } from "./errors";
@@ -188,14 +187,11 @@ export class GameManager {
             );
             try {
                 if (message.type == MessageType.PLAY_CARD) {
-                    this.handle_play_card(
-                        current_player,
-                        (message as PlayCard).card,
-                    );
+                    await this.handle_play_card(current_player, message.card);
                 } else if (message.type == MessageType.DRAW_CARD_REQUEST) {
-                    this.handle_draw_card(
+                    await this.handle_draw_card(
                         current_player_idx,
-                        (message as DrawCardRequest).initial_card,
+                        message.initial_card,
                     );
                 }
             } catch (e) {
@@ -203,6 +199,7 @@ export class GameManager {
                     console.info(`Encountered game rule violation: ${e}`);
                     this.on_violation(e);
                 }
+                // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
                 console.error(`Encountered Error: ${e}.`);
             }
             if (this.current_phase instanceof Finished) {
