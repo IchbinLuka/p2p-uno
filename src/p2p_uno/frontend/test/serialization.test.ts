@@ -1,16 +1,13 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect } from "vitest";
 import {
     deserialize_message,
     serialize_message,
-} from "../model/serialization";
-import { SignManager } from "../model/signing";
-import type { Player } from "../model/types";
-import {
-    MessageType,
-    type DrawCardRequest,
-    type MessageData,
-} from "../model/connection";
+} from "../src/model/serialization";
+import { SignManager } from "../src/model/signing";
+import type { Player } from "../src/model/types";
+import { MessageType, type DrawCardRequest } from "../src/model/connection";
 
 describe("Test serialization + deserialization of messages", () => {
     it("serialization & deserialization", () => {
@@ -42,15 +39,11 @@ describe("Test serialization + deserialization of messages", () => {
         };
 
         const message: DrawCardRequest = {
+            type: MessageType.DRAW_CARD_REQUEST,
             initial_card: manager1.sampleCard(),
         };
 
-        const message_data: MessageData = {
-            type: MessageType.DRAW_CARD_REQUEST,
-            message,
-        };
-
-        const signed = await manager1.signMessage(message_data, "bob");
+        const signed = await manager1.signMessage(message, "bob");
         expect.assert(manager2.verifyMessage(signed, players));
     });
 });

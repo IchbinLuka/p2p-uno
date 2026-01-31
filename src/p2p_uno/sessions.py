@@ -1,3 +1,4 @@
+import itertools
 import logging
 import secrets
 import uuid
@@ -49,13 +50,24 @@ class PlayerAlreadyExists(RuntimeError):
         super().__init__(f"Player {name} already exists")
 
 
+class SessionFull(RuntimeError):
+    def __init__(self, name: str) -> None:
+        super().__init__(f"Session {name} is full")
+
+
 class Session:
-    def __init__(self) -> None:
+    def __init__(self, session_id: str, name: str, max_players: int) -> None:
         self.players: dict[str, Player] = {}
+        self.session_id = session_id
+        self.name = name
+        self.max_players = max_players
+        self.started: bool = False
 
     def add_player(self, player: Player):
         if player.name in self.players:
             raise PlayerAlreadyExists(player.name)
+        if len(self.players) >= self.max_players:
+            raise SessionFull(self.name)
         self.players[player.name] = player
 
     def remove_player(self, name: str):
@@ -99,18 +111,51 @@ class Session:
 SESSIONS: dict[str, Session] = {}
 
 
+class SessionRepr(pydantic.BaseModel):
+    session_id: str
+    session_name: str
+    player_count: int
+    max_players: int
+
+
+class SessionCreate(pydantic.BaseModel):
+    session_name: str
+    max_players: int
+
+
 @app.post("/")
-async def create_session():
+async def create_session(body: SessionCreate):
     session_id = uuid.uuid4()
-    session = Session()
+    session = Session(
+        session_id=str(session_id),
+        name=body.session_name,
+        max_players=body.max_players,
+    )
     SESSIONS[str(session_id)] = session
     logger.debug(f"Created session {session_id}")
-    return {"session_id": session_id}
+    return SessionRepr(
+        session_id=str(session_id),
+        session_name=body.session_name,
+        player_count=0,
+        max_players=body.max_players,
+    )
 
 
 @app.get("/")
-async def get_sessions():
-    return list(SESSIONS.keys())
+async def get_sessions(skip: int, limit: int) -> list[SessionRepr]:
+    limit = min(limit, 100)
+    return [
+        SessionRepr(
+            session_id=session_id,
+            session_name=session.name,
+            player_count=len(session.players),
+            max_players=session.max_players,
+        )
+        for session_id, session in itertools.islice(
+            SESSIONS.items(), skip, skip + limit
+        )
+        if session.player_count() < session.max_players and not session.started
+    ]
 
 
 class PlayerMessage(pydantic.BaseModel):

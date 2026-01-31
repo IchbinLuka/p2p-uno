@@ -38,5 +38,5 @@ export function serialize_message(obj: object): string {
 }
 
 export function deserialize_message(raw: string): object {
-    return JSON.parse(raw, uint8array_deserialize);
+    return JSON.parse(raw, uint8array_deserialize) as object;
 }

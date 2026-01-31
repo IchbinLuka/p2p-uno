@@ -14,7 +14,7 @@ export class UnexpectedMessageType extends PlayerError {
     }
 
     toString() {
-        return `Unexpected Message Type: ${this.actual}. Expected one of ${this.expected}`;
+        return `Unexpected Message Type: ${this.actual}. Expected one of ${JSON.stringify(this.expected)}`;
     }
 }
 
@@ -108,23 +108,30 @@ class ConnectionRouter {
                 }
                 this.seen_messages.add(data);
                 const message = deserialize_message(data) as PlayerMessage;
-                if (!this.sign_manager.verifyMessage(message, players)) {
-                    return; // TODO: should we do something here?
-                }
-                for (const forward_conn of this.player_connections) {
-                    if (forward_conn.player == conn.player) continue;
-                    forward_conn.channel.send(data);
-                }
-                let handled = false;
-                for (const listener of this.listeners) {
-                    handled = handled || listener(message);
-                }
-                if (!handled) {
-                    if (this.buffered_messages.length > 1000) {
-                        this.buffered_messages.shift();
+                void (async () => {
+                    if (
+                        !(await this.sign_manager.verifyMessage(
+                            message,
+                            players,
+                        ))
+                    ) {
+                        return; // TODO: should we do something here?
                     }
-                    this.buffered_messages.push(message);
-                }
+                    for (const forward_conn of this.player_connections) {
+                        if (forward_conn.player == conn.player) continue;
+                        forward_conn.channel.send(data);
+                    }
+                    let handled = false;
+                    for (const listener of this.listeners) {
+                        handled = handled || listener(message);
+                    }
+                    if (!handled) {
+                        if (this.buffered_messages.length > 1000) {
+                            this.buffered_messages.shift();
+                        }
+                        this.buffered_messages.push(message);
+                    }
+                })();
             });
         }
     }
