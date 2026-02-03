@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { Button, Form, Input, InputNumber } from "antd";
 import BackButton from "../components/BackButton";
 import Page from "../components/Page";
+import { useTranslation } from "react-i18next";
 
 interface FormProps {
     name: string;
@@ -11,6 +12,7 @@ interface FormProps {
 }
 
 function CreateSession() {
+    const { t } = useTranslation();
     const api = useContext(APIContext)!;
     const navigate = useNavigate();
 
@@ -40,7 +42,7 @@ function CreateSession() {
     return (
         <Page>
             <div style={{ textAlign: "center" }}>
-                <h1>Create Session</h1>
+                <h1>{t("session.create")}</h1>
                 <Form
                     layout="horizontal"
                     onFinish={handleSubmit}
@@ -52,14 +54,14 @@ function CreateSession() {
                     style={{ maxWidth: 600, textAlign: "left" }}
                 >
                     <Form.Item<FormProps>
-                        label="Session Name"
+                        label={t("session.name")}
                         name="name"
                         rules={[{ required: true }]}
                     >
-                        <Input placeholder="Enter a Name" />
+                        <Input placeholder={t("session.name_hint")} />
                     </Form.Item>
                     <Form.Item
-                        label="Max. Player Count"
+                        label={t("session.max_player_count")}
                         name="max_players"
                         rules={[{ required: true }]}
                     >
@@ -74,17 +76,9 @@ function CreateSession() {
                     >
                         <BackButton dest="/" />
                         <Button type="primary" htmlType="submit">
-                            Create Session
+                            {t("session.create")}
                         </Button>
                     </div>
-                    {/*<Form.Item
-                        style={{
-                            display: "flex",
-                            justifyContent: "center",
-                            flexDirection: "row",
-                        }}
-                    >
-                    </Form.Item>*/}
                 </Form>
                 {error && <p>{error}</p>}
             </div>

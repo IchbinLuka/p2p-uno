@@ -1,0 +1,13 @@
+{
+    "session": {
+        "create": "Create Session",
+        "name_hint": "Enter a Name",
+        "name": "Session Name",
+        "max_player_count": "Max. Player Count",
+        "open": "Open Sessions",
+        "load_more": "Load more",
+        "player_count": "{{player_count}} Players",
+        "join": "Join"
+    },
+    "go_back": "Go Back"
+}

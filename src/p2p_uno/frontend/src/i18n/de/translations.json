@@ -1,0 +1,13 @@
+{
+    "session": {
+        "create": "Sitzung erstellen",
+        "name_hint": "Name eingeben",
+        "name": "Sitzung Name",
+        "max_player_count": "Max. Spieleranzahl",
+        "open": "Offene Sitzungen",
+        "load_more": "Mehr laden",
+        "player_count": "{{player_count}} Spieler",
+        "join": "Beitreten"
+    },
+    "go_back": "Zurück"
+}

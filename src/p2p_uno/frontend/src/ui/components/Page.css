@@ -7,7 +7,7 @@
     align-items: center;
 }
 
-.header * {
+.header > * {
     margin-inline: 10px;
 }
 
