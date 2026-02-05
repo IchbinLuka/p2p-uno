@@ -1,4 +1,6 @@
+import asyncio
 import itertools
+import json
 import logging
 import secrets
 import uuid
@@ -7,7 +9,7 @@ from typing import Any, Callable
 
 import ecdsa
 import pydantic
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from typing_extensions import Coroutine
 
 from p2p_uno.signatures import Verifier
@@ -65,6 +67,7 @@ class Session:
 
     def add_player(self, player: Player):
         if player.name in self.players:
+            print(self.players)
             raise PlayerAlreadyExists(player.name)
         if len(self.players) >= self.max_players:
             raise SessionFull(self.name)
@@ -73,6 +76,7 @@ class Session:
     def remove_player(self, name: str):
         if name not in self.players:
             raise PlayerNotFound(name)
+        logger.debug(f"Removing player {name} from session {self.name}")
         del self.players[name]
 
     def get_players(self) -> list[Player]:
@@ -106,6 +110,25 @@ class Session:
         if player is None:
             raise PlayerNotFound(recipient)
         await player.on_ice_candidate(sender, payload, ice_type)
+
+    async def start(self):
+        end_message = json.dumps(
+            {
+                "verified_players": [
+                    {"name": player.name, "key": encode_b64(player.public_key)}
+                    for player in self.players.values()
+                    if player.accepted
+                ],
+                "type": "lobbyend",
+            }
+        )
+        self.started = True
+        await asyncio.gather(
+            *[
+                player.websocket.send_text(end_message)
+                for player in self.players.values()
+            ]
+        )
 
 
 SESSIONS: dict[str, Session] = {}
@@ -156,6 +179,14 @@ async def get_sessions(skip: int, limit: int) -> list[SessionRepr]:
         )
         if session.player_count() < session.max_players and not session.started
     ]
+
+
+@app.get("/{session_id}/available")
+async def name_available(name: str, session_id: str):
+    session = SESSIONS.get(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return {"available": name.strip() in session.players}
 
 
 class PlayerMessage(pydantic.BaseModel):
@@ -214,7 +245,7 @@ async def join_session(websocket: WebSocket, session_id: str):
     public_key = decode_b64(request.public_key)
     verifier = Verifier(public_key)
     player = Player(
-        name=request.name,
+        name=request.name.strip(),
         public_key=public_key,
         # First player should be automatically accepted
         accepted=session.player_count() == 0,
@@ -273,5 +304,9 @@ async def join_session(websocket: WebSocket, session_id: str):
                     player.accepted = False
                     await websocket.close()
                     return
+            elif message["type"] == "start":
+                await session.start()
     except WebSocketDisconnect:
-        ...
+        session.remove_player(player.name)
+        if session.player_count() == 0:
+            SESSIONS.pop(session.session_id)

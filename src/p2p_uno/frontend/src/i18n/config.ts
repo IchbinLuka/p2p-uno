@@ -19,6 +19,14 @@ export const SUPPORTED_LANGUAGES: Lang[] = [
     },
 ];
 
+function get_browser_lang(): string {
+    const browserLang = navigator.language.split("-")[0];
+    const supportedLang = SUPPORTED_LANGUAGES.find(
+        (lang) => lang.code === browserLang,
+    );
+    return supportedLang ? supportedLang.code : "en";
+}
+
 i18n.use(initReactI18next)
     .init({
         interpolation: {
@@ -32,7 +40,7 @@ i18n.use(initReactI18next)
                 translation: translation_de,
             },
         },
-        lng: navigator.language,
+        lng: get_browser_lang(),
         fallbackLng: "en",
     })
     .catch((e) => {

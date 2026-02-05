@@ -1,0 +1,57 @@
+.card-bar {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    --card-overlap: -50px;
+    padding: 8px;
+    /* prevent the flex container from shrinking items unexpectedly */
+    gap: 0;
+    max-width: 95vw;
+    overflow: hidden;
+}
+
+/* Card wrapper: small vertical spacing is preserved, horizontal spacing comes from overlap */
+.card-container {
+    /* vertical margins only; horizontal offset is handled by the adjacent selector below */
+    margin: 10px 0;
+    display: inline-block; /* isolate transforms from sibling flow */
+    position: relative; /* allows z-index to work */
+    z-index: 1;
+    transition:
+        transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
+        box-shadow 200ms ease,
+        margin-left 150ms ease;
+    will-change: transform;
+    cursor: pointer;
+    user-select: none;
+}
+
+/* Apply horizontal overlap to every card except the first one */
+.card-container + .card-container {
+    margin-left: var(--card-overlap);
+}
+
+/* Hover: lift the card, add soft shadow and bring it to front */
+.card-container:hover {
+    transform: translateY(-10px);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
+    z-index: 500;
+}
+
+/* Active/click: slightly less lift for a tactile feel */
+.card-container:active {
+    transform: translateY(-6px);
+    transition-duration: 120ms;
+}
+
+/* Make it easy to override overlap per-instance: e.g.
+   .card-bar { --card-overlap: -70px; } or inline style on .card-bar element.
+   You can also animate overlap by changing the variable with media queries.
+*/
+
+/* Responsive example (optional): reduce overlap on small screens to avoid extreme stacking */
+/* Uncomment if desired
+@media (max-width: 480px) {
+    .card-bar { --card-overlap: -35px; }
+}
+*/

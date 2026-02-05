@@ -7,6 +7,7 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import CreateSession from "./ui/pages/CreateSession";
 import GameSession from "./ui/pages/GameSession";
 import { ConfigProvider, theme } from "antd";
+import MainGame from "./ui/pages/MainGame";
 
 function App() {
     const [api, _] = useState(new API("http://localhost:8000"));
@@ -24,6 +25,7 @@ function App() {
                             path="/session/:session_id"
                             element={<GameSession />}
                         />
+                        <Route path="/card_test" element={<MainGame />} />
                     </Routes>
                 </BrowserRouter>
             </APIContext.Provider>

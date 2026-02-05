@@ -7,7 +7,19 @@
         "open": "Open Sessions",
         "load_more": "Load more",
         "player_count": "{{player_count}} Players",
-        "join": "Join"
+        "join": "Join",
+        "start": "Start Session",
+        "waiting": "Waiting Lobby",
+        "no_sessions": "No sessions found"
     },
-    "go_back": "Go Back"
+    "player": {
+        "name": "Player Name",
+        "enter_name": "Please enter a name"
+    },
+    "status": {
+        "connected": "Connected",
+        "connecting": "Connecting..."
+    },
+    "go_back": "Go Back",
+    "confirm": "Confirm"
 }

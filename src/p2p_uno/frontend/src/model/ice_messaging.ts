@@ -10,9 +10,7 @@ enum IceType {
 type WebsocketMessage = LobbyEnd | IncomingIce;
 
 interface LobbyEnd {
-    verified_players: {
-        [key: string]: string;
-    };
+    verified_players: { name: string; key: string }[];
     type: "lobbyend";
 }
 
@@ -28,6 +26,10 @@ interface OutgoingIce {
     recipient: string;
     ice_type: IceType;
     payload: object;
+}
+
+interface StartSession {
+    type: "start";
 }
 
 enum SignMessageType {
@@ -105,134 +107,270 @@ export async function create_session(): Promise<string> {
     return session_id;
 }
 
-export async function establish_connections(
-    name: string,
-    session_id: string,
-    sign_manager: SignManager,
-): Promise<ConnectionResult> {
-    const websocket = new WebSocket(`ws://${HOST}/sessions/${session_id}`);
-    // Wait until websocket is open
-    await new Promise<void>((resolve, reject) => {
-        websocket.onopen = () => resolve();
-        websocket.onerror = (err) => reject(new WebsocketError(err));
-    });
+export interface PlayerStatus {
+    player_name: string;
+    connected: boolean;
+}
 
-    const join_message: JoinMessage = {
-        name,
-        public_key: uint8_to_b64(sign_manager.publicKeyExported),
-    };
-    websocket.send(JSON.stringify(join_message));
-    const session_info: SessionInfoMessage = await new Promise(
-        (resolve, reject) => {
-            websocket.onmessage = (msg) =>
-                resolve(JSON.parse(msg.data as string) as SessionInfoMessage);
-            websocket.onerror = (event) => reject(new WebsocketError(event));
-        },
-    );
-    console.debug("Received session info:", session_info);
+export class ConnectionEstablishHandler {
+    private player_connections: Record<string, RTCPeerConnection> = {};
+    private player_channels: Record<string, RTCDataChannel> = {};
+    private player_keys: Record<string, Uint8Array> = {};
+    private player_proofs: Record<string, string> = {};
+    private pending_ice: Record<string, RTCIceCandidate[]> = {};
+    private sign_manager: SignManager;
+    private session_info: SessionInfoMessage;
+    private websocket: WebSocket;
+    private on_update: (players: PlayerStatus[]) => void;
+    private on_finished: (result: ConnectionResult) => void;
 
-    const send_ice = (msg: OutgoingIce) => websocket.send(JSON.stringify(msg));
+    private constructor(
+        sign_manager: SignManager,
+        session_info: SessionInfoMessage,
+        websocket: WebSocket,
+        on_update: (players: PlayerStatus[]) => void,
+        on_finished: (result: ConnectionResult) => void,
+    ) {
+        this.sign_manager = sign_manager;
+        this.session_info = session_info;
+        this.websocket = websocket;
+        this.on_update = on_update;
+        this.on_finished = on_finished;
+    }
 
-    const player_connections: { [key: string]: RTCPeerConnection } = {};
-    const player_channels: { [key: string]: RTCDataChannel } = {};
-    const player_keys: { [key: string]: Uint8Array } = {};
-    const player_proofs: { [key: string]: string } = {};
-
-    const handle_data_channel = (channel: RTCDataChannel, p: string) => {
+    private handle_data_channel(channel: RTCDataChannel, peer_name: string) {
         console.log("Data channel created");
-        player_channels[p] = channel;
+        this.player_channels[peer_name] = channel;
         channel.onmessage = async (msg) => {
-            console.log(`Received message from player ${p}: ${msg.data}`);
+            console.log(
+                `Received message from player ${peer_name}: ${msg.data}`,
+            );
             const request: SignMessage = JSON.parse(
                 msg.data as string,
             ) as SignMessage;
             if (request.type == SignMessageType.REQUEST) {
-                const signature = await sign_manager.signPayload(
+                const signature = await this.sign_manager.signPayload(
                     b64_to_uint8(request.nonce),
                 );
                 const message: SignResponse = {
                     type: SignMessageType.RESPONSE,
                     signature: uint8_to_b64(signature),
                     nonce: request.nonce,
-                    key: uint8_to_b64(sign_manager.publicKeyExported),
+                    key: uint8_to_b64(this.sign_manager.publicKeyExported),
                 };
-                player_channels[p].send(JSON.stringify(message));
-            } else if (p in session_info.player_keys) {
+                this.player_channels[peer_name].send(JSON.stringify(message));
+            } else if (peer_name in this.session_info.player_keys) {
                 // If the player is not in player keys, we do not need a proof
-                if (request.nonce !== session_info.challenge_nonce) {
+                if (request.nonce !== this.session_info.challenge_nonce) {
                     // We got the wrong message
                     throw new Error("Invalid nonce");
                 }
-                player_proofs[p] = request.signature;
-                player_keys[p] = b64_to_uint8(request.key);
+                this.player_proofs[peer_name] = request.signature;
+                this.player_keys[peer_name] = b64_to_uint8(request.key);
                 // Check if we have collected all required proofs
                 if (
-                    Object.keys(player_proofs).length ==
-                    Object.keys(session_info.player_keys).length
+                    Object.keys(this.player_proofs).length ==
+                    Object.keys(this.session_info.player_keys).length
                 ) {
-                    websocket.send(
+                    this.websocket.send(
                         JSON.stringify({
                             type: "proof",
-                            player_payloads: player_proofs,
+                            player_payloads: this.player_proofs,
                         } satisfies ChallengeProof),
                     );
                 }
             }
         }; // on_message
         const message: SignRequest = {
-            nonce: session_info.challenge_nonce,
+            nonce: this.session_info.challenge_nonce,
             type: SignMessageType.REQUEST,
         };
         console.log("Sending message:", message);
-        channel.onopen = () => channel.send(JSON.stringify(message));
-    }; // on_datachannel
+        channel.onopen = () => {
+            this.on_update(
+                Object.entries(this.player_channels).map(([p, channel]) => {
+                    return {
+                        player_name: p,
+                        connected: channel.readyState === "open",
+                    };
+                }),
+            );
 
-    const lobby_end = await new Promise<LobbyEnd>((resolve) => {
-        const create_connection = (p: string) => {
-            const connection = new RTCPeerConnection({
-                iceServers: session_info.ice_servers,
-            });
-            connection.onicegatheringstatechange = () => {
-                console.debug(
-                    `Ice gathering state changed for player ${p}: ${connection.iceGatheringState}`,
-                );
-            };
-            connection.oniceconnectionstatechange = () => {
-                console.debug(
-                    `Ice connection state changed for player ${p}: ${connection.iceConnectionState}`,
-                );
-            };
-            connection.onconnectionstatechange = (_e) => {
-                console.debug(
-                    `Connection state changed for player ${p}: ${connection.connectionState}`,
-                );
-            };
-            connection.ondatachannel = (e) => {
-                handle_data_channel(e.channel, p);
-            };
-            connection.onicecandidate = (event) => {
-                if (event.candidate == null) return;
-                send_ice({
-                    type: "ice",
-                    recipient: p,
-                    payload: event.candidate,
-                    ice_type: IceType.Candidate,
-                });
-            };
-            return connection;
+            channel.send(JSON.stringify(message));
         };
+    }
 
+    private create_connection(peer_name: string) {
+        const connection = new RTCPeerConnection({
+            iceServers: this.session_info.ice_servers,
+        });
+        connection.onicegatheringstatechange = () => {
+            console.debug(
+                `Ice gathering state changed for player ${peer_name}: ${connection.iceGatheringState}`,
+            );
+        };
+        connection.oniceconnectionstatechange = () => {
+            console.debug(
+                `Ice connection state changed for player ${peer_name}: ${connection.iceConnectionState}`,
+            );
+        };
+        connection.onconnectionstatechange = (_e) => {
+            console.debug(
+                `Connection state changed for player ${peer_name}: ${connection.connectionState}`,
+            );
+        };
+        connection.ondatachannel = (e) => {
+            this.handle_data_channel(e.channel, peer_name);
+        };
+        connection.onicecandidate = (event) => {
+            if (event.candidate == null) return;
+            this.send_ice({
+                type: "ice",
+                recipient: peer_name,
+                payload: event.candidate,
+                ice_type: IceType.Candidate,
+            });
+        };
+        return connection;
+    }
+
+    private send_ice(msg: OutgoingIce) {
+        this.websocket.send(JSON.stringify(msg));
+    }
+
+    private handle_lobby_end(end_msg: LobbyEnd) {
+        const result: PlayerConnection[] = [];
+
+        for (const { name, key } of end_msg.verified_players) {
+            result.push({
+                name,
+                data_channel: this.player_channels[name],
+                connection: this.player_connections[name],
+                public_key: b64_to_uint8(key),
+            });
+        }
+
+        this.on_finished({ players: result });
+    }
+
+    private async on_message(msg: WebsocketMessage) {
+        console.log(`Received message: ${JSON.stringify(msg)}`);
+
+        if (msg.type === "lobbyend") {
+            this.handle_lobby_end(msg);
+            return;
+        }
+
+        const connection = this.player_connections[msg.sender];
+
+        switch (msg.ice_type) {
+            case IceType.Answer:
+                await connection.setRemoteDescription(
+                    msg.payload as RTCSessionDescriptionInit,
+                );
+                break;
+            case IceType.Candidate:
+                if (connection == null) {
+                    if (!(msg.sender in this.pending_ice)) {
+                        this.pending_ice[msg.sender] = [];
+                    }
+                    this.pending_ice[msg.sender].push(
+                        msg.payload as RTCIceCandidate,
+                    );
+                }
+                await connection.addIceCandidate(msg.payload);
+                break;
+            case IceType.Offer: {
+                if (msg.sender in this.player_connections) {
+                    this.player_connections[msg.sender].close();
+                    delete this.player_connections[msg.sender];
+                }
+                this.player_connections[msg.sender] = this.create_connection(
+                    msg.sender,
+                );
+                await this.player_connections[msg.sender].setRemoteDescription(
+                    msg.payload as RTCSessionDescriptionInit,
+                );
+                const answer =
+                    await this.player_connections[msg.sender].createAnswer();
+                await this.player_connections[msg.sender].setLocalDescription(
+                    answer,
+                );
+                this.send_ice({
+                    type: "ice",
+                    recipient: msg.sender,
+                    payload: answer,
+                    ice_type: IceType.Answer,
+                });
+                if (msg.sender in this.pending_ice) {
+                    for (const candidate of this.pending_ice[msg.sender]) {
+                        await this.player_connections[
+                            msg.sender
+                        ].addIceCandidate(candidate);
+                    }
+                    delete this.pending_ice[msg.sender];
+                }
+                break;
+            }
+        } // switch
+    }
+
+    static async create(
+        name: string,
+        session_id: string,
+        sign_manager: SignManager,
+        on_update: (players: PlayerStatus[]) => void,
+        on_session_start: (result: ConnectionResult) => void,
+    ): Promise<ConnectionEstablishHandler> {
+        console.debug("Opening websocket");
+        const websocket = new WebSocket(`ws://${HOST}/sessions/${session_id}`);
+        // Wait until websocket is open
+        await new Promise<void>((resolve, reject) => {
+            websocket.onopen = () => resolve();
+            websocket.onerror = (err) => reject(new WebsocketError(err));
+        });
+
+        const join_message: JoinMessage = {
+            name,
+            public_key: uint8_to_b64(sign_manager.publicKeyExported),
+        };
+        websocket.send(JSON.stringify(join_message));
+        const session_info: SessionInfoMessage = await new Promise(
+            (resolve, reject) => {
+                websocket.onmessage = (msg) =>
+                    resolve(
+                        JSON.parse(msg.data as string) as SessionInfoMessage,
+                    );
+                websocket.onerror = (event) =>
+                    reject(new WebsocketError(event));
+            },
+        );
+        const handler = new ConnectionEstablishHandler(
+            sign_manager,
+            session_info,
+            websocket,
+            on_update,
+            on_session_start,
+        );
+        websocket.onmessage = (msg) => {
+            handler
+                .on_message(JSON.parse(msg.data as string) as WebsocketMessage)
+                .catch((e) => {
+                    console.error("Error handling message:", e);
+                });
+        };
+        console.debug("Received session info:", session_info);
         for (const player of Object.keys(session_info.player_keys)) {
-            const connection = create_connection(player);
-            player_connections[player] = connection;
+            const connection = handler.create_connection(player);
+            handler.player_connections[player] = connection;
             const data_channel =
                 connection.createDataChannel("game_communication");
-            handle_data_channel(data_channel, player);
+            handler.handle_data_channel(data_channel, player);
             connection
                 .createOffer()
                 .then(async (offer) => {
                     await connection.setLocalDescription(offer);
-                    send_ice({
+                    handler.send_ice({
                         type: "ice",
                         recipient: player,
                         payload: offer,
@@ -245,87 +383,12 @@ export async function establish_connections(
                     );
                 });
         }
-
-        const pending_ice: { [key: string]: RTCIceCandidate[] } = {};
-        websocket.onmessage = async (msg) => {
-            const parsed = JSON.parse(msg.data as string) as WebsocketMessage;
-
-            console.log(`Received message: ${JSON.stringify(parsed)}`);
-
-            if (parsed.type === "lobbyend") {
-                resolve(parsed);
-                return;
-            }
-
-            const connection = player_connections[parsed.sender];
-
-            switch (parsed.ice_type) {
-                case IceType.Answer:
-                    await connection.setRemoteDescription(
-                        parsed.payload as RTCSessionDescriptionInit,
-                    );
-                    break;
-                case IceType.Candidate:
-                    if (connection == null) {
-                        if (!(parsed.sender in pending_ice)) {
-                            pending_ice[parsed.sender] = [];
-                        }
-                        pending_ice[parsed.sender].push(
-                            parsed.payload as RTCIceCandidate,
-                        );
-                    }
-                    await connection.addIceCandidate(parsed.payload);
-                    break;
-                case IceType.Offer: {
-                    if (parsed.sender in player_connections) {
-                        player_connections[parsed.sender].close();
-                        delete player_connections[parsed.sender];
-                    }
-                    player_connections[parsed.sender] = create_connection(
-                        parsed.sender,
-                    );
-                    await player_connections[
-                        parsed.sender
-                    ].setRemoteDescription(
-                        parsed.payload as RTCSessionDescriptionInit,
-                    );
-                    const answer =
-                        await player_connections[parsed.sender].createAnswer();
-                    await player_connections[parsed.sender].setLocalDescription(
-                        answer,
-                    );
-                    send_ice({
-                        type: "ice",
-                        recipient: parsed.sender,
-                        payload: answer,
-                        ice_type: IceType.Answer,
-                    });
-                    if (parsed.sender in pending_ice) {
-                        for (const candidate of pending_ice[parsed.sender]) {
-                            await player_connections[
-                                parsed.sender
-                            ].addIceCandidate(candidate);
-                        }
-                        delete pending_ice[parsed.sender];
-                    }
-                    break;
-                }
-            } // switch
-        }; // on_message
-    });
-
-    const result: PlayerConnection[] = [];
-
-    for (const [player, key] of Object.entries(lobby_end.verified_players)) {
-        result.push({
-            name: player,
-            data_channel: player_channels[key],
-            connection: player_connections[key],
-            public_key: b64_to_uint8(key),
-        });
+        return handler;
     }
 
-    return {
-        players: result,
-    };
+    start_session() {
+        this.websocket.send(
+            JSON.stringify({ type: "start" } satisfies StartSession),
+        );
+    }
 }

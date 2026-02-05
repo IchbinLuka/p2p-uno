@@ -7,7 +7,19 @@
         "open": "Offene Sitzungen",
         "load_more": "Mehr laden",
         "player_count": "{{player_count}} Spieler",
-        "join": "Beitreten"
+        "join": "Beitreten",
+        "start": "Sitzung starten",
+        "waiting": "Warten",
+        "no_sessions": "Keine Sitzungen gefunden"
     },
-    "go_back": "Zurück"
+    "player": {
+        "name": "Spielername",
+        "enter_name": "Bitte gib einen Namen ein"
+    },
+    "status": {
+        "connected": "Verbunden",
+        "connecting": "Verbinde..."
+    },
+    "go_back": "Zurück",
+    "confirm": "Bestätigen"
 }

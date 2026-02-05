@@ -1,10 +1,11 @@
 import { useContext, useState } from "react";
 import { APIContext } from "../context";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button, Form, Input, InputNumber } from "antd";
 import BackButton from "../components/BackButton";
 import Page from "../components/Page";
 import { useTranslation } from "react-i18next";
+import PageTitle from "../components/PageTitle";
 
 interface FormProps {
     name: string;
@@ -15,6 +16,9 @@ function CreateSession() {
     const { t } = useTranslation();
     const api = useContext(APIContext)!;
     const navigate = useNavigate();
+    const [query_params, _] = useSearchParams();
+
+    const player_name = query_params.get("name");
 
     const [error, setError] = useState("");
 
@@ -31,7 +35,9 @@ function CreateSession() {
                 data.name,
                 data.max_players,
             );
-            await navigate(`/session/${session.session_id}?is_host=true`);
+            await navigate(
+                `/session/${session.session_id}?is_host=true&name=${player_name}`,
+            );
         })().catch((error) => setError((error as { message: string }).message));
         // try {
         // } catch (error) {
@@ -42,7 +48,7 @@ function CreateSession() {
     return (
         <Page>
             <div style={{ textAlign: "center" }}>
-                <h1>{t("session.create")}</h1>
+                <PageTitle>{t("session.create")}</PageTitle>
                 <Form
                     layout="horizontal"
                     onFinish={handleSubmit}

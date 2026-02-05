@@ -2,6 +2,7 @@ import "./Page.css";
 import { SUPPORTED_LANGUAGES } from "../../i18n/config";
 import { useTranslation } from "react-i18next";
 import { Select } from "antd";
+import { Link } from "react-router-dom";
 
 const items = SUPPORTED_LANGUAGES.map((lang) => ({
     value: lang.code,
@@ -16,7 +17,9 @@ function Page({ children }: { children: React.ReactNode }) {
     return (
         <>
             <header className="header">
-                <h2>P2P Uno</h2>
+                <Link to="/">
+                    <h2>P2P Uno</h2>
+                </Link>
                 <div>
                     <Select
                         // style={{ width: 120 }}
