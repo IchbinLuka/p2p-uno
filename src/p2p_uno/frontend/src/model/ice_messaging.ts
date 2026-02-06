@@ -69,8 +69,8 @@ interface SessionInfoMessage {
 
 export interface PlayerConnection {
     name: string;
-    data_channel: RTCDataChannel;
-    connection: RTCPeerConnection;
+    data_channel: RTCDataChannel | undefined;
+    connection: RTCPeerConnection | undefined;
     public_key: Uint8Array;
 }
 
@@ -240,6 +240,10 @@ export class ConnectionEstablishHandler {
 
     private handle_lobby_end(end_msg: LobbyEnd) {
         const result: PlayerConnection[] = [];
+
+        for (const channel of Object.values(this.player_channels)) {
+            channel.onmessage = null;
+        }
 
         for (const { name, key } of end_msg.verified_players) {
             result.push({

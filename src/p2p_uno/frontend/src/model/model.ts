@@ -9,7 +9,7 @@ import {
     type SignCardMessage,
     type SkipTurn,
 } from "./connection";
-import { GameManager, WaitingPlay } from "./game";
+import { DrawingCard, GameManager, WaitingPhase } from "./game";
 import {
     ConnectionEstablishHandler,
     type ConnectionResult,
@@ -19,10 +19,15 @@ import { SignManager } from "./signing";
 import type { CardType, KnownCard, PlayerGame } from "./types";
 import { ValueNotifier } from "./util";
 
+export interface UICard {
+    card_type: CardType;
+    uuid: string;
+}
+
 export interface GameState {
     current_player: string;
     player_card_counts: Record<string, number>;
-    own_cards: KnownCard[];
+    own_cards: UICard[];
     top_card: CardType | null;
 }
 
@@ -32,10 +37,10 @@ export class GameRunning {
     private readonly game_manager: GameManager;
     private readonly connection_manager: ConnectionManager;
     private readonly sign_manager: SignManager;
-    private readonly own_name: string;
+    readonly own_name: string;
     private readonly player_order: string[];
     private readonly self_idx: number;
-    private own_cards: KnownCard[] = [];
+    own_cards: Record<string, KnownCard> = {};
 
     state: ValueNotifier<GameState | Preparing> = new ValueNotifier<
         GameState | Preparing
@@ -58,25 +63,32 @@ export class GameRunning {
         }
         this.connection_manager = new ConnectionManagerImpl(
             new ConnectionRouter(
-                connection_result.players.map((p) => {
-                    return {
-                        player: p.name,
-                        channel: p.data_channel,
-                    };
-                }),
+                connection_result.players
+                    .filter((p) => p.data_channel != null)
+                    .map((p) => {
+                        return {
+                            player: p.name,
+                            channel: p.data_channel!,
+                        };
+                    }),
                 sign_manager,
                 players,
             ),
         );
-        this.connection_manager.add_message_request_listener(
+        this.connection_manager.add_manual_message_resolver(
             this.own_name,
             MessageType.DRAW_CARD_REQUEST,
             async () => await this.draw_card(),
         );
-        this.connection_manager.add_message_request_listener(
+        this.connection_manager.add_manual_message_resolver(
             this.own_name,
             MessageType.PLAY_CARD,
             async () => await this.play_card(this.own_cards[0]),
+        );
+        this.connection_manager.add_manual_message_resolver(
+            this.own_name,
+            MessageType.SIGN_CARD,
+            async () => await this.sign_card(),
         );
         this.player_order = connection_result.players.map((p) => p.name);
         this.self_idx = this.player_order.indexOf(this.own_name);
@@ -88,22 +100,54 @@ export class GameRunning {
             players,
         );
         this.game_manager.add_phase_listener((phase) => {
-            if (phase instanceof WaitingPlay) {
+            if (phase instanceof WaitingPhase) {
                 this.state.value = {
                     current_player: this.player_order[phase.current_player_idx],
                     top_card: phase.top_card,
                     player_card_counts: phase.player_card_counts,
-                    own_cards: this.own_cards,
+                    own_cards: Object.values(this.own_cards),
                 };
             }
+        });
+        this.run().catch((error) => {
+            console.error("Error running game:", error);
         });
     }
 
     async run() {
+        // We need to ensure that the connection managers for the other peers have
+        // created before starting the game.
+        // TODO: Find a solution for this race condition
+        await new Promise((resolve) => setTimeout(resolve, 1000));
         await this.game_manager.game_flow();
     }
 
+    private async sign_card() {
+        const phase = this.game_manager.get_state().phase;
+        if (!(phase instanceof DrawingCard)) {
+            console.error("Unexpected phase:", phase);
+            return;
+        }
+        if (phase.next_player !== this.own_name) {
+            console.error("Unexpected next player:", phase.next_player);
+            return;
+        }
+        const signed = await this.sign_manager.signCard(
+            phase.current_card,
+            this.own_name,
+        );
+        const message: SignCardMessage = {
+            type: MessageType.SIGN_CARD,
+            signature:
+                signed.signatures[signed.signatures.length - 1].signature,
+        };
+        this.connection_manager.manual_send(
+            await this.sign_manager.signMessage(message, this.own_name),
+        );
+    }
+
     async draw_card() {
+        console.debug("Drawing card");
         const initial_card = this.sign_manager.sampleCard();
         const message: DrawCardRequest = {
             type: MessageType.DRAW_CARD_REQUEST,
@@ -116,11 +160,15 @@ export class GameRunning {
 
         const card = initial_card;
 
-        for (let i = 0; i < this.player_order.length; i++) {
+        for (let i = 1; i < this.player_order.length; i++) {
             const player =
                 this.player_order[
                     (this.self_idx + i) % this.player_order.length
                 ];
+            console.log(`Waiting for signature from ${player}`);
+            console.debug(
+                `this.self_idx: ${this.self_idx}, player_idx: ${player}`,
+            );
             const sign_message = (await this.connection_manager.await_message(
                 player,
                 [MessageType.SIGN_CARD],
@@ -139,7 +187,7 @@ export class GameRunning {
             signed_card,
             this.own_name,
         );
-        this.own_cards.push(final_card);
+        this.own_cards[final_card.uuid] = final_card;
         const finalize_message: FinalizeCardDraw = {
             type: MessageType.FINALIZE_CARD_DRAW,
             card_hash: final_card.hash,
@@ -160,7 +208,7 @@ export class GameRunning {
         this.connection_manager.manual_send(
             await this.sign_manager.signMessage(message, this.own_name),
         );
-        this.own_cards = this.own_cards.filter((c) => c !== card);
+        delete this.own_cards[card.uuid];
     }
 
     async skip_turn() {

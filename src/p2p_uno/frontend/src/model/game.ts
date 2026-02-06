@@ -18,7 +18,7 @@ import type {
 
 const INITIAL_CARD_COUNT = 7;
 
-class DrawingCard {
+export class DrawingCard {
     current_card: Card;
     next_player: string;
 
@@ -27,7 +27,7 @@ class DrawingCard {
         this.next_player = next_player;
     }
 }
-export class WaitingPlay {
+export class WaitingPhase {
     current_player_idx: number;
     player_card_counts: Record<string, number>;
     top_card: CardType;
@@ -51,9 +51,17 @@ class Finished {
     }
 }
 
-class Preparing {}
+class Preparing {
+    current_player: string;
+    current_card: Card | null;
 
-type GamePhase = DrawingCard | WaitingPlay | Finished | Preparing;
+    constructor(current_player: string, current_card: Card | null) {
+        this.current_player = current_player;
+        this.current_card = current_card;
+    }
+}
+
+type GamePhase = DrawingCard | WaitingPhase | Finished | Preparing;
 
 interface GameResult {
     winner?: string;
@@ -84,7 +92,7 @@ export class GameManager {
     ) {
         this.sign_manager = sign_manager;
         this.players = players;
-        this.current_phase = new Preparing();
+        this.current_phase = new Preparing(player_order[0], null);
         this.player_order = player_order;
         this.connection_manager = connection_manager;
         this.top_card = null;
@@ -99,7 +107,7 @@ export class GameManager {
         this.phase_listeners.delete(listener);
     }
 
-    update_phase(new_phase: GamePhase) {
+    private update_phase(new_phase: GamePhase) {
         this.current_phase = new_phase;
         this.phase_listeners.forEach((listener) => listener(new_phase));
     }
@@ -185,8 +193,8 @@ export class GameManager {
         const card: Card = initial_card;
         // Signatures from peers
         for (
-            let i = player_idx;
-            i < player_idx + Object.keys(this.players).length - 1;
+            let i = player_idx + 1;
+            i < player_idx + Object.keys(this.players).length;
             i++
         ) {
             const current_player =
@@ -194,6 +202,9 @@ export class GameManager {
             const message = await this.connection_manager.await_message(
                 current_player.name,
                 [MessageType.SIGN_CARD],
+            );
+            console.debug(
+                `GameManager: Received signature from ${current_player.name}`,
             );
             const signature = (message as SignCardMessage).signature;
             card.signatures.push({
@@ -216,6 +227,7 @@ export class GameManager {
             ...card,
         };
         player.cards[final_card.uuid] = final_card;
+        console.debug(`Finalized ${final_card.uuid} for ${player.name}`);
     }
 
     get_player_card_counts(): Record<string, number> {
@@ -241,7 +253,7 @@ export class GameManager {
             throw e;
         }
         this.update_phase(
-            new WaitingPlay(0, this.get_player_card_counts(), this.top_card!),
+            new WaitingPhase(0, this.get_player_card_counts(), this.top_card!),
         );
         let current_player_idx = 0;
         while (true) {
@@ -295,6 +307,13 @@ export class GameManager {
             }
             current_player_idx =
                 (current_player_idx + 1) % this.player_order.length;
+            this.update_phase(
+                new WaitingPhase(
+                    current_player_idx,
+                    this.get_player_card_counts(),
+                    this.top_card!,
+                ),
+            );
         }
     }
 }

@@ -44,14 +44,22 @@
     transition-duration: 120ms;
 }
 
-/* Make it easy to override overlap per-instance: e.g.
-   .card-bar { --card-overlap: -70px; } or inline style on .card-bar element.
-   You can also animate overlap by changing the variable with media queries.
-*/
-
-/* Responsive example (optional): reduce overlap on small screens to avoid extreme stacking */
-/* Uncomment if desired
-@media (max-width: 480px) {
-    .card-bar { --card-overlap: -35px; }
+.player-state-card {
+    border-radius: 20px;
+    background-color: rgb(61, 82, 92);
+    width: 70px;
+    height: 100px;
+    place-content: center;
+    border-width: 2px;
+    border-style: solid;
+    border-color: transparent;
 }
-*/
+
+.player-state-card h3 {
+    font-size: 30px;
+    font-weight: bold;
+}
+
+.has-turn {
+    border-color: yellow;
+}

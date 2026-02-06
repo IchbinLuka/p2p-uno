@@ -166,6 +166,7 @@ export class SignManager {
         const payloadToSign = new TextEncoder().encode(
             serialize_message(message),
         );
+        console.debug(`Payload to sign: ${serialize_message(message)}`);
 
         const signature = await window.crypto.subtle.sign(
             ALGORITHM_PARAMS,
@@ -194,9 +195,17 @@ export class SignManager {
     ): Promise<boolean> {
         const player = message.player;
         const key = players[player]?.public_key;
-        if (key == null) return false;
+        if (key == null) {
+            console.error(`Player ${player} not found`);
+            return false;
+        }
+        // console.debug(`Players: ${serialize_message(players)}`);
+        // console.debug(`Own key: ${serialize_message(this.publicKeyExported)}`);
+        // console.debug(`Checking with key: ${serialize_message(key)}`);
 
-        const payload = new TextEncoder().encode(serialize_message(message));
+        const payload = new TextEncoder().encode(
+            serialize_message(message.payload),
+        );
 
         const publicKey = await window.crypto.subtle.importKey(
             "raw",

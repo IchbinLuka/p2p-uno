@@ -45,7 +45,7 @@ export interface SkipTurn {
 export interface SignCardMessage {
     // Fixing an enum variant here allows for smart casting
     type: MessageType.SIGN_CARD;
-    card_nonce: Uint8Array;
+    // card_nonce: Uint8Array;
     signature: Uint8Array;
 }
 
@@ -83,12 +83,12 @@ export interface ConnectionManager {
     await_message(player_name: string, types: MessageType[]): Promise<Message>;
     add_kick_vote_listener(listener: KickListener): void;
     manual_send(message: PlayerMessage): void;
-    add_message_request_listener(
+    add_manual_message_resolver(
         player_name: string,
         message_type: MessageType,
         listener: MessageRequestListener,
     ): void;
-    remove_message_request_listener(
+    remove_manual_message_resolver(
         player_name: string,
         message_type: MessageType,
         listener: MessageRequestListener,
@@ -140,7 +140,9 @@ export class ConnectionRouter {
      *               originate from a remote connection, but rather a local interaction.
      */
     on_message(message: string, source: string | null) {
+        console.debug(`Received message from ${source}: ${message}`);
         if (this.seen_messages.has(message)) {
+            console.debug(`Already handled message: ${message}`);
             return; // We already handled this message
         }
         this.seen_messages.add(message);
@@ -149,13 +151,18 @@ export class ConnectionRouter {
             if (
                 !(await this.sign_manager.verifyMessage(parsed, this.players))
             ) {
+                console.error(`Invalid signature for message: ${message}`);
                 return; // TODO: should we do something here?
             }
             for (const forward_conn of this.player_connections) {
                 if (forward_conn.player == source) continue;
+                console.debug(
+                    `Forwarding message to ${forward_conn.player}: ${message}`,
+                );
                 forward_conn.channel.send(message);
             }
             let handled = false;
+            console.debug(`Sending to ${this.listeners.size} listeners`);
             for (const listener of this.listeners) {
                 handled = handled || listener(parsed);
             }
@@ -163,6 +170,7 @@ export class ConnectionRouter {
                 if (this.buffered_messages.length > 1000) {
                     this.buffered_messages.shift();
                 }
+                console.debug(`Buffered message: ${message}`);
                 this.buffered_messages.push(parsed);
             }
         })();
@@ -180,12 +188,26 @@ export class ConnectionRouter {
     }
 }
 
+function stringify_listeners(
+    listeners: Map<string, Set<MessageRequestListener>>,
+) {
+    return Array.from(listeners.entries())
+        .map(([key, value]) => {
+            return `${key} -> ${Array.from(value)
+                .map((listener) => listener.name)
+                .join(", ")}`;
+        })
+        .join("\n");
+}
+
+function listener_key(player_name: string, message_type: MessageType): string {
+    return `${player_name}:${message_type}`;
+}
+
 export class ConnectionManagerImpl implements ConnectionManager {
     private kick_listeners: KickListener[] = [];
-    private message_request_listeners: Map<
-        [string, MessageType],
-        Set<MessageRequestListener>
-    > = new Map();
+    private message_resolvers: Map<string, Set<MessageRequestListener>> =
+        new Map();
     private router: ConnectionRouter;
 
     constructor(router: ConnectionRouter) {
@@ -202,31 +224,31 @@ export class ConnectionManagerImpl implements ConnectionManager {
         });
     }
 
-    add_message_request_listener(
+    add_manual_message_resolver(
         player_name: string,
         message_type: MessageType,
         listener: MessageRequestListener,
     ): void {
-        const key: [string, MessageType] = [player_name, message_type];
-        if (!this.message_request_listeners.has(key)) {
-            this.message_request_listeners.set(key, new Set());
+        const key = listener_key(player_name, message_type);
+        if (!this.message_resolvers.has(key)) {
+            this.message_resolvers.set(key, new Set());
         }
-        this.message_request_listeners.get(key)!.add(listener);
+        this.message_resolvers.get(key)!.add(listener);
     }
 
-    remove_message_request_listener(
+    remove_manual_message_resolver(
         player_name: string,
         message_type: MessageType,
         listener: MessageRequestListener,
     ): void {
-        const key: [string, MessageType] = [player_name, message_type];
-        if (!this.message_request_listeners.has(key)) {
+        const key = listener_key(player_name, message_type);
+        if (!this.message_resolvers.has(key)) {
             return;
         }
-        const listeners = this.message_request_listeners.get(key)!;
+        const listeners = this.message_resolvers.get(key)!;
         listeners.delete(listener);
         if (listeners.size === 0) {
-            this.message_request_listeners.delete(key);
+            this.message_resolvers.delete(key);
         }
     }
 
@@ -238,12 +260,18 @@ export class ConnectionManagerImpl implements ConnectionManager {
         player_name: string,
         types: MessageType[],
     ): Promise<Message> {
+        console.debug(
+            `Awaiting ${JSON.stringify(types)} message from ${player_name}`,
+        );
+        console.debug(
+            `Listeners: ${stringify_listeners(this.message_resolvers)}`,
+        );
         // Invoke manual handlers
         for (const type of types) {
-            const listeners = this.message_request_listeners.get([
-                player_name,
-                type,
-            ]);
+            const listeners = this.message_resolvers.get(
+                listener_key(player_name, type),
+            );
+            // console.debug(`Listeners for ${player_name}:${type}: ${listeners}`);
             if (listeners == null) continue;
             for (const list of listeners) {
                 await list();
@@ -263,6 +291,7 @@ export class ConnectionManagerImpl implements ConnectionManager {
                     );
                     return false;
                 }
+                console.debug(`Received ${msg.payload.type} message`);
                 resolve(msg.payload);
                 return true;
             };

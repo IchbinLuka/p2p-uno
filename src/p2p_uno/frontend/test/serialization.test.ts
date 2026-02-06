@@ -44,6 +44,8 @@ describe("Test serialization + deserialization of messages", () => {
         };
 
         const signed = await manager1.signMessage(message, "bob");
-        expect.assert(manager2.verifyMessage(signed, players));
+        const serialized = serialize_message(signed);
+        const deserialized = deserialize_message(serialized) as PlayerMessage;
+        expect.assert(await manager2.verifyMessage(deserialized, players));
     });
 });

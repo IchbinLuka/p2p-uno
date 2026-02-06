@@ -1,9 +1,10 @@
 import { useParams, useSearchParams } from "react-router-dom";
 import Page from "../components/Page";
 import { useEffect, useRef, useState } from "react";
-import { GameModel, Waiting } from "../../model/model";
+import { GameModel, GameRunning, Waiting } from "../../model/model";
 import WaitLobby from "./WaitLobby";
 import { useValueListenable } from "../utils";
+import MainGame from "./MainGame";
 
 function GameSession() {
     const params = useParams();
@@ -53,6 +54,9 @@ function GameSession() {
         return (
             <WaitLobby wait={phase} self_name={player_name} is_host={is_host} />
         );
+    }
+    if (phase instanceof GameRunning) {
+        return <MainGame game={phase} />;
     }
     return <Page>Loading...</Page>;
 }
