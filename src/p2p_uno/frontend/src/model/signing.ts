@@ -1,12 +1,14 @@
 import type { Message, PlayerMessage } from "./connection";
 import { serialize_message } from "./serialization";
-import type { Card, KnownCard, Player } from "./types";
+import { ALL_CARDS, type Card, type KnownCard, type Player } from "./types";
 
 const ALGORITHM_PARAMS = {
     name: "ECDSA",
     namedCurve: "P-256",
     hash: { name: "SHA-256" },
 };
+
+type Players = Partial<Record<string, Player>>;
 
 export class SignManager {
     private keyPair!: CryptoKeyPair;
@@ -76,10 +78,7 @@ export class SignManager {
      * Verifies that all signatures currently attached to the card are valid[cite: 23].
      * This iterates through the signature chain.
      */
-    async verifyCard(
-        card: Card,
-        players: { [key: string]: Player | undefined },
-    ): Promise<boolean> {
+    async verifyCard(card: Card, players: Players): Promise<boolean> {
         let currentPayload = card.initial_nonce;
 
         for (let i = 0; i < card.signatures.length; i++) {
@@ -118,13 +117,13 @@ export class SignManager {
     async verifyKnownCard(
         card: KnownCard,
         expectedHash: Uint8Array,
-        players: { [key: string]: Player | undefined },
+        players: Players,
     ): Promise<boolean> {
-        // 1. Verify the signature chain [cite: 23]
+        // 1. Verify the signature chain
         const signaturesValid = await this.verifyCard(card, players);
         if (!signaturesValid) return false;
 
-        // 2. Verify the hash matches h1(rN) [cite: 22]
+        // 2. Verify the hash matches h1(rN)
         const finalSignature = card.signatures[card.signatures.length - 1];
         const actualHash = await window.crypto.subtle.digest(
             "SHA-256",
@@ -135,6 +134,29 @@ export class SignManager {
         return actualHashArray.every(
             (val, index) => val === expectedHash[index],
         );
+    }
+
+    async finalizeCard(card: Card, own_name: string): Promise<KnownCard> {
+        if (card.signatures[card.signatures.length - 1].author !== own_name) {
+            throw new Error(
+                "Can only finalize cards last signed by the player.",
+            );
+        }
+        // Hash last signature down to 0..ALL_CARDS.length-1
+        const lastSignature = card.signatures[card.signatures.length - 1];
+        const hash = await window.crypto.subtle.digest(
+            "SHA-256",
+            lastSignature.signature.buffer as ArrayBuffer,
+        );
+        const hashArray = new Uint8Array(hash);
+        const index =
+            lastSignature.signature.reduce((acc, val) => acc + val, 0) %
+            ALL_CARDS.length;
+        return {
+            ...card,
+            hash: hashArray,
+            card_type: ALL_CARDS[index],
+        };
     }
 
     async signMessage(
@@ -168,7 +190,7 @@ export class SignManager {
 
     async verifyMessage(
         message: PlayerMessage,
-        players: { [key: string]: Player | undefined },
+        players: Players,
     ): Promise<boolean> {
         const player = message.player;
         const key = players[player]?.public_key;

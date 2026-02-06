@@ -1,12 +1,180 @@
 import {
+    ConnectionManagerImpl,
+    ConnectionRouter,
+    MessageType,
+    type ConnectionManager,
+    type DrawCardRequest,
+    type FinalizeCardDraw,
+    type PlayCard,
+    type SignCardMessage,
+    type SkipTurn,
+} from "./connection";
+import { GameManager, WaitingPlay } from "./game";
+import {
     ConnectionEstablishHandler,
     type ConnectionResult,
     type PlayerStatus,
 } from "./ice_messaging";
 import { SignManager } from "./signing";
+import type { CardType, KnownCard, PlayerGame } from "./types";
 import { ValueNotifier } from "./util";
 
-export class GameRunning {}
+export interface GameState {
+    current_player: string;
+    player_card_counts: Record<string, number>;
+    own_cards: KnownCard[];
+    top_card: CardType | null;
+}
+
+export type Preparing = "preparing";
+
+export class GameRunning {
+    private readonly game_manager: GameManager;
+    private readonly connection_manager: ConnectionManager;
+    private readonly sign_manager: SignManager;
+    private readonly own_name: string;
+    private readonly player_order: string[];
+    private readonly self_idx: number;
+    private own_cards: KnownCard[] = [];
+
+    state: ValueNotifier<GameState | Preparing> = new ValueNotifier<
+        GameState | Preparing
+    >("preparing");
+
+    constructor(
+        connection_result: ConnectionResult,
+        sign_manager: SignManager,
+        own_name: string,
+    ) {
+        this.own_name = own_name;
+        this.sign_manager = sign_manager;
+        const players: Record<string, PlayerGame> = {};
+        for (const player of connection_result.players) {
+            players[player.name] = {
+                cards: {},
+                name: player.name,
+                public_key: player.public_key,
+            };
+        }
+        this.connection_manager = new ConnectionManagerImpl(
+            new ConnectionRouter(
+                connection_result.players.map((p) => {
+                    return {
+                        player: p.name,
+                        channel: p.data_channel,
+                    };
+                }),
+                sign_manager,
+                players,
+            ),
+        );
+        this.connection_manager.add_message_request_listener(
+            this.own_name,
+            MessageType.DRAW_CARD_REQUEST,
+            async () => await this.draw_card(),
+        );
+        this.connection_manager.add_message_request_listener(
+            this.own_name,
+            MessageType.PLAY_CARD,
+            async () => await this.play_card(this.own_cards[0]),
+        );
+        this.player_order = connection_result.players.map((p) => p.name);
+        this.self_idx = this.player_order.indexOf(this.own_name);
+        this.game_manager = new GameManager(
+            sign_manager,
+            this.player_order,
+            this.connection_manager,
+            (_) => {},
+            players,
+        );
+        this.game_manager.add_phase_listener((phase) => {
+            if (phase instanceof WaitingPlay) {
+                this.state.value = {
+                    current_player: this.player_order[phase.current_player_idx],
+                    top_card: phase.top_card,
+                    player_card_counts: phase.player_card_counts,
+                    own_cards: this.own_cards,
+                };
+            }
+        });
+    }
+
+    async run() {
+        await this.game_manager.game_flow();
+    }
+
+    async draw_card() {
+        const initial_card = this.sign_manager.sampleCard();
+        const message: DrawCardRequest = {
+            type: MessageType.DRAW_CARD_REQUEST,
+            initial_card,
+        };
+
+        this.connection_manager.manual_send(
+            await this.sign_manager.signMessage(message, this.own_name),
+        );
+
+        const card = initial_card;
+
+        for (let i = 0; i < this.player_order.length; i++) {
+            const player =
+                this.player_order[
+                    (this.self_idx + i) % this.player_order.length
+                ];
+            const sign_message = (await this.connection_manager.await_message(
+                player,
+                [MessageType.SIGN_CARD],
+            )) as SignCardMessage;
+
+            card.signatures.push({
+                signature: sign_message.signature,
+                author: player,
+            });
+        }
+        const signed_card = await this.sign_manager.signCard(
+            card,
+            this.own_name,
+        );
+        const final_card = await this.sign_manager.finalizeCard(
+            signed_card,
+            this.own_name,
+        );
+        this.own_cards.push(final_card);
+        const finalize_message: FinalizeCardDraw = {
+            type: MessageType.FINALIZE_CARD_DRAW,
+            card_hash: final_card.hash,
+        };
+        this.connection_manager.manual_send(
+            await this.sign_manager.signMessage(
+                finalize_message,
+                this.own_name,
+            ),
+        );
+    }
+
+    async play_card(card: KnownCard) {
+        const message: PlayCard = {
+            type: MessageType.PLAY_CARD,
+            card,
+        };
+        this.connection_manager.manual_send(
+            await this.sign_manager.signMessage(message, this.own_name),
+        );
+        this.own_cards = this.own_cards.filter((c) => c !== card);
+    }
+
+    async skip_turn() {
+        const nonce = new Uint8Array(32);
+        window.crypto.getRandomValues(nonce);
+        const message: SkipTurn = {
+            type: MessageType.SKIP_TURN,
+            nonce,
+        };
+        this.connection_manager.manual_send(
+            await this.sign_manager.signMessage(message, this.own_name),
+        );
+    }
+}
 
 export class Waiting {
     private establish_handler: ConnectionEstablishHandler | null = null;
@@ -47,14 +215,6 @@ export class Waiting {
         )
             .then((handler) => (this.establish_handler = handler))
             .catch((e: Error) => on_error(e));
-        // this._promise = establish_connections(
-        //     player_name,
-        //     session_id,
-        //     sign_manager,
-        //     on_update,
-        // )
-        //     .then((result) => on_game_start(result))
-        //     .catch((error: Error) => on_error(error));
     }
 
     /**
@@ -107,8 +267,12 @@ export class GameModel extends EventTarget {
     }
 
     join_session(player_name: string, session_id: string) {
-        const on_game_start = (_result: ConnectionResult) => {
-            this.game_phase.value = new GameRunning();
+        const on_game_start = (result: ConnectionResult) => {
+            this.game_phase.value = new GameRunning(
+                result,
+                this.sign_manager,
+                player_name,
+            );
         };
         const on_error = (error: Error) => {
             console.error(error); // TODO

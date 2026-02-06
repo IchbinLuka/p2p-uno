@@ -3,11 +3,18 @@ import {
     type ConnectionManager,
     type DrawCardRequest,
     type FinalizeCardDraw,
+    type PlayCard,
     type SignCardMessage,
 } from "./connection";
 import { InvalidAction, InvalidSignature, PlayerError } from "./errors";
 import type { SignManager } from "./signing";
-import type { Card, CardType, KnownCard, Player, UnknownCard } from "./types";
+import type {
+    Card,
+    CardType,
+    KnownCard,
+    PlayerGame,
+    UnknownCard,
+} from "./types";
 
 const INITIAL_CARD_COUNT = 7;
 
@@ -20,11 +27,19 @@ class DrawingCard {
         this.next_player = next_player;
     }
 }
-class WaitingPlay {
+export class WaitingPlay {
     current_player_idx: number;
+    player_card_counts: Record<string, number>;
+    top_card: CardType;
 
-    constructor(current_player: number) {
+    constructor(
+        current_player: number,
+        player_card_counts: Record<string, number>,
+        top_card: CardType,
+    ) {
         this.current_player_idx = current_player;
+        this.player_card_counts = player_card_counts;
+        this.top_card = top_card;
     }
 }
 
@@ -36,7 +51,9 @@ class Finished {
     }
 }
 
-type GamePhase = DrawingCard | WaitingPlay | Finished;
+class Preparing {}
+
+type GamePhase = DrawingCard | WaitingPlay | Finished | Preparing;
 
 interface GameResult {
     winner?: string;
@@ -50,26 +67,41 @@ interface GameResult {
 export class GameManager {
     private sign_manager: SignManager;
     private current_phase: GamePhase;
-    private players: { [key: string]: Player };
+    private players: Record<string, PlayerGame>;
     private player_order: string[];
     private connection_manager: ConnectionManager;
     private top_card: CardType | null;
     private on_violation: (violation: PlayerError) => void;
+    private readonly phase_listeners: Set<(state: GamePhase) => void> =
+        new Set();
 
     constructor(
         sign_manager: SignManager,
         player_order: string[],
         connection_manager: ConnectionManager,
         on_violation: (violation: PlayerError) => void,
-        players: { [key: string]: Player },
+        players: Record<string, PlayerGame>,
     ) {
         this.sign_manager = sign_manager;
         this.players = players;
-        this.current_phase = new WaitingPlay(0);
+        this.current_phase = new Preparing();
         this.player_order = player_order;
         this.connection_manager = connection_manager;
         this.top_card = null;
         this.on_violation = on_violation;
+    }
+
+    add_phase_listener(listener: (state: GamePhase) => void) {
+        this.phase_listeners.add(listener);
+    }
+
+    remove_phase_listener(listener: (state: GamePhase) => void) {
+        this.phase_listeners.delete(listener);
+    }
+
+    update_phase(new_phase: GamePhase) {
+        this.current_phase = new_phase;
+        this.phase_listeners.forEach((listener) => listener(new_phase));
     }
 
     get_state() {
@@ -82,18 +114,32 @@ export class GameManager {
     private async prepare_game() {
         for (let p = 0; p < this.player_order.length; p++) {
             const player = this.player_order[p];
-            for (let i = 0; i < INITIAL_CARD_COUNT; i++) {
+            // The first player needs to draw one more card as in the first round
+            // there is no top card yet
+            const card_count =
+                p == 0 ? INITIAL_CARD_COUNT + 1 : INITIAL_CARD_COUNT;
+            for (let i = 0; i < card_count; i++) {
                 const request = await this.connection_manager.await_message(
-                    this.players[player],
+                    this.players[player].name,
                     [MessageType.DRAW_CARD_REQUEST],
                 );
                 const initial = (request as DrawCardRequest).initial_card;
                 await this.handle_draw_card(p, initial);
             }
         }
+        // Expect the first player to play a card
+        const first_player = this.player_order[0];
+        const top_card_play = (await this.connection_manager.await_message(
+            first_player,
+            [MessageType.PLAY_CARD],
+        )) as PlayCard;
+        await this.handle_play_card(
+            this.players[first_player],
+            top_card_play.card,
+        );
     }
 
-    private async handle_play_card(player: Player, card: KnownCard) {
+    private async handle_play_card(player: PlayerGame, card: KnownCard) {
         if (
             this.top_card != null &&
             card.card_type.number !== this.top_card.number &&
@@ -130,6 +176,12 @@ export class GameManager {
                 player.name,
             );
         }
+        this.update_phase(
+            new DrawingCard(
+                initial_card,
+                this.player_order[(player_idx + 1) % this.player_order.length],
+            ),
+        );
         const card: Card = initial_card;
         // Signatures from peers
         for (
@@ -140,7 +192,7 @@ export class GameManager {
             const current_player =
                 this.players[this.player_order[i % this.player_order.length]];
             const message = await this.connection_manager.await_message(
-                current_player,
+                current_player.name,
                 [MessageType.SIGN_CARD],
             );
             const signature = (message as SignCardMessage).signature;
@@ -155,7 +207,7 @@ export class GameManager {
 
         // Signature from initiator
         const finalization = await this.connection_manager.await_message(
-            player,
+            player.name,
             [MessageType.FINALIZE_CARD_DRAW],
         );
         const hash = (finalization as FinalizeCardDraw).card_hash;
@@ -164,6 +216,18 @@ export class GameManager {
             ...card,
         };
         player.cards[final_card.uuid] = final_card;
+    }
+
+    get_player_card_counts(): Record<string, number> {
+        const counts: Record<string, number> = {};
+        for (const player of Object.values(this.players)) {
+            counts[player.name] = Object.keys(player.cards).length;
+        }
+        return counts;
+    }
+
+    get_top_card(): CardType {
+        return this.top_card!;
     }
 
     async game_flow(): Promise<GameResult> {
@@ -176,14 +240,20 @@ export class GameManager {
             // If unexpected error, propagate up
             throw e;
         }
-        this.current_phase = new WaitingPlay(0);
+        this.update_phase(
+            new WaitingPlay(0, this.get_player_card_counts(), this.top_card!),
+        );
         let current_player_idx = 0;
         while (true) {
             const current_player =
                 this.players[this.player_order[current_player_idx]];
             const message = await this.connection_manager.await_message(
-                current_player,
-                [MessageType.DRAW_CARD_REQUEST, MessageType.PLAY_CARD],
+                current_player.name,
+                [
+                    MessageType.DRAW_CARD_REQUEST,
+                    MessageType.PLAY_CARD,
+                    MessageType.SKIP_TURN,
+                ],
             );
             try {
                 if (message.type == MessageType.PLAY_CARD) {
@@ -193,6 +263,21 @@ export class GameManager {
                         current_player_idx,
                         message.initial_card,
                     );
+                    const message2 =
+                        await this.connection_manager.await_message(
+                            current_player.name,
+                            [MessageType.PLAY_CARD, MessageType.SKIP_TURN],
+                        );
+                    if (message2.type == MessageType.PLAY_CARD) {
+                        await this.handle_play_card(
+                            current_player,
+                            message2.card,
+                        );
+                    } else if (message2.type == MessageType.SKIP_TURN) {
+                        // Do nothing
+                    }
+                } else if (message.type == MessageType.SKIP_TURN) {
+                    // Do nothing
                 }
             } catch (e) {
                 if (e instanceof PlayerError) {
