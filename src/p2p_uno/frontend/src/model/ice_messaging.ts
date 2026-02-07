@@ -367,8 +367,14 @@ export class ConnectionEstablishHandler {
         for (const player of Object.keys(session_info.player_keys)) {
             const connection = handler.create_connection(player);
             handler.player_connections[player] = connection;
-            const data_channel =
-                connection.createDataChannel("game_communication");
+            const data_channel = connection.createDataChannel(
+                "game_communication",
+                {
+                    ordered: true,
+                    // maxPacketLifeTime: 10_000,
+                    // maxRetransmits: 10_000,
+                },
+            );
             handler.handle_data_channel(data_channel, player);
             connection
                 .createOffer()

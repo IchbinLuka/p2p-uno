@@ -1,5 +1,6 @@
 import { AsyncQueue } from "./async_queue";
 import { PlayerError } from "./errors";
+import { Semaphore } from "./semaphore";
 import { deserialize_message, serialize_message } from "./serialization";
 import type { SignManager } from "./signing";
 import type { Card, KnownCard, PlayerGame } from "./types";
@@ -110,13 +111,14 @@ interface PlayerConnection {
 type MessageListener = (message: PlayerMessage) => boolean;
 
 export class ConnectionRouter {
-    private player_connections: PlayerConnection[];
-    private sign_manager: SignManager;
-    private seen_messages: Set<string> = new Set();
+    private readonly player_connections: PlayerConnection[];
+    private readonly sign_manager: SignManager;
+    private readonly seen_messages: Set<string> = new Set();
     readonly message_queue: AsyncQueue<PlayerMessage> = new AsyncQueue();
     private buffered_messages: PlayerMessage[] = [];
-    private listeners: Set<MessageListener> = new Set();
-    private players: Record<string, PlayerGame>;
+    private readonly listeners: Set<MessageListener> = new Set();
+    private readonly players: Record<string, PlayerGame>;
+    private readonly message_mutex: Semaphore = new Semaphore(1);
 
     constructor(
         player_connections: PlayerConnection[],
@@ -158,10 +160,12 @@ export class ConnectionRouter {
         this.seen_messages.add(message);
         const parsed = deserialize_message(message) as PlayerMessage;
         void (async () => {
+            await this.message_mutex.acquire();
             if (
                 !(await this.sign_manager.verifyMessage(parsed, this.players))
             ) {
                 console.error(`Invalid signature for message: ${message}`);
+                this.message_mutex.release();
                 return; // TODO: should we do something here?
             }
             for (const forward_conn of this.player_connections) {
@@ -172,18 +176,7 @@ export class ConnectionRouter {
                 forward_conn.channel.send(message);
             }
             this.message_queue.enqueue(parsed);
-            // let handled = false;
-            // console.debug(`Sending to ${this.listeners.size} listeners`);
-            // for (const listener of this.listeners) {
-            //     handled = handled || listener(parsed);
-            // }
-            // if (!handled) {
-            //     if (this.buffered_messages.length > 1000) {
-            //         this.buffered_messages.shift();
-            //     }
-            //     console.debug(`Buffered message: ${message}`);
-            //     this.buffered_messages.push(parsed);
-            // }
+            this.message_mutex.release();
         })();
     }
 
