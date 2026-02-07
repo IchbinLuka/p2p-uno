@@ -4,15 +4,16 @@ import Title from "antd/es/typography/Title";
 import Paragraph from "antd/es/typography/Paragraph";
 import { useTranslation } from "react-i18next";
 import BackButton from "../components/BackButton";
+import PageTitle from "../components/PageTitle";
 
 function Credits() {
     const { t } = useTranslation();
     return (
         <Page>
+            <PageTitle>{t("credits.title")}</PageTitle>
             <Typography style={{ flexGrow: 1 }}>
-                <Title>{t("credits.title")}</Title>
                 <Paragraph>{t("credits.thanks_for_playing")}</Paragraph>
-                <Title>{t("credits.asset_attributions")}</Title>
+                <Title level={2}>{t("credits.asset_attributions")}</Title>
                 <Paragraph>
                     Crown by Alejandro from{" "}
                     <a
