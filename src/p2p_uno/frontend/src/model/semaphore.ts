@@ -1,37 +1,33 @@
+// Thanks to https://medium.com/@artemkhrenov/advanced-concurrency-patterns-in-javascript-semaphore-mutex-read-write-lock-deadlock-prevention-79e8bffb5b81
 export class Semaphore {
     private current: number;
     private maxConcurrent: number;
     private queue: (() => void)[];
-    // Think of this like setting up your coffee shop at opening time
+
     constructor(maxConcurrent = 1) {
-        this.maxConcurrent = maxConcurrent; // How many keys you have (default is 1)
-        this.current = 0; // How many keys are currently in use
-        this.queue = []; // The line of people waiting for a key
+        this.maxConcurrent = maxConcurrent;
+        this.current = 0;
+        this.queue = [];
     }
 
-    // When someone asks for a key
     async acquire() {
-        // If we have an available key
         if (this.current < this.maxConcurrent) {
-            this.current++; // Mark one more key as being used
-            return Promise.resolve(); // Here's your key, go ahead!
+            this.current++;
+            return Promise.resolve();
         }
 
-        // If all keys are in use, get in line and wait
         return new Promise<void>((resolve) => {
-            this.queue.push(resolve); // Add person to the waiting line
+            this.queue.push(resolve);
         });
     }
 
-    // When someone returns a key
     release() {
-        this.current--; // One less key in use
+        this.current--;
 
-        // If there's people waiting AND we have available keys
         if (this.queue.length > 0 && this.current < this.maxConcurrent) {
-            this.current++; // Mark key as being used
-            const next = this.queue.shift()!; // Get first person in line
-            next(); // Give them the key
+            this.current++;
+            const next = this.queue.shift()!;
+            next();
         }
     }
 }
