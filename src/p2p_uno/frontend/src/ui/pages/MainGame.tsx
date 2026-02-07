@@ -7,6 +7,7 @@ import type { GameRunning, GameState, UICard } from "../../model/model";
 import { useValueListenable } from "../utils";
 import { Button } from "antd";
 import LoadingIndicator from "../components/LoadingIndicator";
+import { useTranslation } from "react-i18next";
 
 function MainGame({ game }: { game: GameRunning }) {
     const state = useValueListenable(game.state);
@@ -37,6 +38,12 @@ function MainGame({ game }: { game: GameRunning }) {
         });
     }
 
+    function on_skip() {
+        game.skip_turn().catch((e) => {
+            console.error(e);
+        });
+    }
+
     return (
         <Page hide_footer>
             <GameVis
@@ -44,6 +51,7 @@ function MainGame({ game }: { game: GameRunning }) {
                 on_card_clicked={on_card_clicked}
                 own_name={game.own_name}
                 on_draw={on_draw}
+                on_skip={on_skip}
             />
         </Page>
     );
@@ -53,15 +61,18 @@ function GameVis({
     state,
     on_card_clicked,
     on_draw,
+    on_skip,
     own_name,
 }: {
     state: GameState;
     on_card_clicked?: (card: UICard) => void;
     on_draw?: () => void;
+    on_skip?: () => void;
     own_name: string;
 }) {
     const barRef = useRef<HTMLDivElement | null>(null);
     const [overlap, setOverlap] = useState<number>(0);
+    const { t } = useTranslation();
 
     useEffect(() => {
         const bar = barRef.current;
@@ -191,9 +202,17 @@ function GameVis({
                     </>
                 )}
             </div>
-            <div>
+            <div style={{ height: 25 }}>
                 {state.current_player === own_name && (
-                    <Button onClick={on_draw}>Draw Card</Button>
+                    <>
+                        <Button onClick={on_skip}>
+                            {t("session.skip_turn")}
+                        </Button>
+                        <div style={{ width: 25, display: "inline-block" }} />
+                        <Button onClick={on_draw}>
+                            {t("session.draw_card")}
+                        </Button>
+                    </>
                 )}
             </div>
             <div

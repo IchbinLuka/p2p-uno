@@ -10,7 +10,9 @@
         "join": "Join",
         "start": "Start Session",
         "waiting": "Waiting Lobby",
-        "no_sessions": "No sessions found"
+        "no_sessions": "No sessions found",
+        "skip_turn": "Skip Turn",
+        "draw_card": "Draw Card"
     },
     "end_screen": {
         "game_over": "Game Over!",
