@@ -12,6 +12,11 @@
         "waiting": "Warten",
         "no_sessions": "Keine Sitzungen gefunden"
     },
+    "end_screen": {
+        "game_over": "Spiel vorbei!",
+        "player_wins": "{{name}} gewinnt!",
+        "back_to_home": "Zurück zum Start"
+    },
     "player": {
         "name": "Spielername",
         "enter_name": "Bitte gib einen Namen ein"
@@ -21,5 +26,10 @@
         "connecting": "Verbinde..."
     },
     "go_back": "Zurück",
-    "confirm": "Bestätigen"
+    "confirm": "Bestätigen",
+    "credits": {
+        "title": "Credits",
+        "thanks_for_playing": "Danke fürs Spielen!",
+        "asset_attributions": "Quellenangaben für verwendete Assets"
+    }
 }

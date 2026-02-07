@@ -8,10 +8,10 @@ const COLOR_CLASS_MAP: Record<Color, string> = {
     [Color.YELLOW]: "card-yellow",
 };
 
-function Card({ card }: { card: CardType }) {
+function Card({ card, active }: { card: CardType; active?: boolean }) {
     const color_class = COLOR_CLASS_MAP[card.color];
     return (
-        <div className={`card ${color_class}`}>
+        <div className={`card ${color_class} ${active ? "card-active" : ""}`}>
             <svg width={70} height={100} xmlns="https://www.w3.org/2000/svg">
                 <text
                     x="50%"

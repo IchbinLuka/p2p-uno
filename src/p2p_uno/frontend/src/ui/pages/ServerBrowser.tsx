@@ -1,7 +1,7 @@
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { APIContext } from "../context";
 import type { Session } from "../../model/api";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Button, List, Form, Input } from "antd";
 import Page from "../components/Page";
 import { useTranslation } from "react-i18next";
@@ -19,7 +19,11 @@ function ServerBrowser() {
     const loadingRef = useRef(false);
     const PAGE_SIZE = 30;
     const [sessions, setSessions] = useState<Session[] | null>(null);
-    const [playerName, setPlayerName] = useState<string>("");
+    const [queryParams] = useSearchParams();
+
+    const [playerName, setPlayerName] = useState<string>(
+        queryParams.get("name") ?? "",
+    );
 
     const loadMoreSessions = useCallback(() => {
         // prevent concurrent loads which cause duplicate appends when useEffect runs twice
@@ -63,7 +67,7 @@ function ServerBrowser() {
                     <Form
                         layout="inline"
                         name="playerNameForm"
-                        initialValues={{ playerName: "" }}
+                        initialValues={{ playerName }}
                         onFinish={(values: FormProps) =>
                             setPlayerName(values.playerName)
                         }

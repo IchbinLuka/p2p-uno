@@ -1,10 +1,20 @@
 import { useParams, useSearchParams } from "react-router-dom";
 import Page from "../components/Page";
 import { useEffect, useRef, useState } from "react";
-import { GameModel, GameRunning, Waiting } from "../../model/model";
+import {
+    GameFinished,
+    GameModel,
+    GameRunning,
+    Waiting,
+} from "../../model/model";
 import WaitLobby from "./WaitLobby";
 import { useValueListenable } from "../utils";
 import MainGame from "./MainGame";
+import crown_logo from "../../assets/crown.svg";
+import PageTitle from "../components/PageTitle";
+import BackButton from "../components/BackButton";
+import { useTranslation } from "react-i18next";
+import LoadingIndicator from "../components/LoadingIndicator";
 
 function GameSession() {
     const params = useParams();
@@ -58,7 +68,39 @@ function GameSession() {
     if (phase instanceof GameRunning) {
         return <MainGame game={phase} />;
     }
-    return <Page>Loading...</Page>;
+    if (phase instanceof GameFinished) {
+        return <FinishPage finished={phase} />;
+    }
+    return (
+        <Page>
+            <LoadingIndicator />
+        </Page>
+    );
+}
+
+export function FinishPage({ finished }: { finished: GameFinished }) {
+    const { t } = useTranslation();
+    return (
+        <Page>
+            <PageTitle>{t("end_screen.game_over")}</PageTitle>
+            <div
+                style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    flexGrow: 1,
+                    justifyContent: "space-evenly",
+                }}
+            >
+                <div>
+                    <img src={crown_logo} width={200} height="auto" />
+                    <h2>
+                        {t("end_screen.player_wins", { name: finished.winner })}
+                    </h2>
+                </div>
+                <BackButton dest="/">{t("end_screen.back_to_home")}</BackButton>
+            </div>
+        </Page>
+    );
 }
 
 export default GameSession;

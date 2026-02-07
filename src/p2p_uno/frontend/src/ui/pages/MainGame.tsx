@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Color } from "../../model/types";
+import { Color, type CardType } from "../../model/types";
 import Card from "../components/Card";
 import Page from "../components/Page";
 import "./MainGame.css";
@@ -26,7 +26,7 @@ function MainGame({ game }: { game: GameRunning }) {
     }
 
     function on_card_clicked(card: UICard) {
-        game.play_card(game.own_cards[card.uuid]).catch((e) => {
+        game.play_card(card).catch((e) => {
             console.error(e);
         });
     }
@@ -38,7 +38,7 @@ function MainGame({ game }: { game: GameRunning }) {
     }
 
     return (
-        <Page>
+        <Page hide_footer>
             <GameVis
                 state={state}
                 on_card_clicked={on_card_clicked}
@@ -132,6 +132,15 @@ function GameVis({
         };
     }, [state.own_cards.length, barRef]);
 
+    function card_active(card: CardType): boolean {
+        if (state.current_player !== own_name) return false;
+        if (state.top_card == null) return true;
+        return (
+            state.top_card?.color === card.color ||
+            state.top_card?.number === card.number
+        );
+    }
+
     // Inline style to set the CSS variable on the card-bar
     const barStyle: React.CSSProperties & { [key: string]: string } = {
         // Set the CSS variable --card-overlap in pixels
@@ -158,6 +167,7 @@ function GameVis({
                     .filter(([name, _]) => name !== own_name)
                     .map(([name, count]) => (
                         <PlayerState
+                            key={name}
                             name={name}
                             card_count={count}
                             has_turn={state.current_player === name}
@@ -174,8 +184,12 @@ function GameVis({
                     width: "100%",
                 }}
             >
-                <Card card={state.top_card!} />
-                <h3>Current Card</h3>
+                {state.top_card != null && (
+                    <>
+                        <Card card={state.top_card} />
+                        <h3>Current Card</h3>
+                    </>
+                )}
             </div>
             <div>
                 {state.current_player === own_name && (
@@ -192,15 +206,27 @@ function GameVis({
                 }}
             >
                 <div className="card-bar" style={barStyle}>
-                    {state.own_cards.map((card: UICard) => (
-                        <div
-                            key={card.uuid}
-                            className="card-container"
-                            onClick={() => on_card_clicked?.(card)}
-                        >
-                            <Card card={card.card_type} />
-                        </div>
-                    ))}
+                    {state.own_cards.map((card: UICard) => {
+                        const active = card_active(card.card_type);
+                        return (
+                            <>
+                                <div
+                                    key={card.uuid}
+                                    className={`card-container ${active ? "card-container-active" : "card-container-unactive"}`}
+                                    onClick={
+                                        active
+                                            ? () => on_card_clicked?.(card)
+                                            : undefined
+                                    }
+                                >
+                                    <Card
+                                        card={card.card_type}
+                                        active={active}
+                                    />
+                                </div>
+                            </>
+                        );
+                    })}
                 </div>
             </div>
         </div>
@@ -232,7 +258,7 @@ function PlayerState({
 
 export function GameVisTest() {
     const [state] = useState<GameState>({
-        current_player: "bob",
+        current_player: "alice",
         player_card_counts: {
             bob: 7,
             alice: 5,
@@ -282,7 +308,13 @@ export function GameVisTest() {
     });
     return (
         <Page>
-            <GameVis state={state} own_name="alice" />
+            <GameVis
+                state={state}
+                own_name="alice"
+                on_card_clicked={(card) => {
+                    console.log(`Card clicked: ${JSON.stringify(card)}`);
+                }}
+            />
         </Page>
     );
 }

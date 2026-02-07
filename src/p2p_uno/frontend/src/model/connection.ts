@@ -1,3 +1,4 @@
+import { AsyncQueue } from "./async_queue";
 import { PlayerError } from "./errors";
 import { deserialize_message, serialize_message } from "./serialization";
 import type { SignManager } from "./signing";
@@ -29,7 +30,7 @@ export enum MessageType {
 
 export type Message =
     | SignCardMessage
-    | DrawCardRequest
+    | DrawCard
     | FinalizeCardDraw
     | PlayCard
     | KickVote
@@ -49,7 +50,7 @@ export interface SignCardMessage {
     signature: Uint8Array;
 }
 
-export interface DrawCardRequest {
+export interface DrawCard {
     type: MessageType.DRAW_CARD_REQUEST;
     initial_card: Card;
 }
@@ -112,6 +113,7 @@ export class ConnectionRouter {
     private player_connections: PlayerConnection[];
     private sign_manager: SignManager;
     private seen_messages: Set<string> = new Set();
+    readonly message_queue: AsyncQueue<PlayerMessage> = new AsyncQueue();
     private buffered_messages: PlayerMessage[] = [];
     private listeners: Set<MessageListener> = new Set();
     private players: Record<string, PlayerGame>;
@@ -128,6 +130,14 @@ export class ConnectionRouter {
             conn.channel.addEventListener("message", (event) =>
                 this.on_message(event.data as string, conn.player),
             );
+        }
+    }
+
+    distribute(message: PlayerMessage) {
+        const serialized = serialize_message(message);
+        this.seen_messages.add(serialized);
+        for (const conn of this.player_connections) {
+            conn.channel.send(serialized);
         }
     }
 
@@ -161,18 +171,19 @@ export class ConnectionRouter {
                 );
                 forward_conn.channel.send(message);
             }
-            let handled = false;
-            console.debug(`Sending to ${this.listeners.size} listeners`);
-            for (const listener of this.listeners) {
-                handled = handled || listener(parsed);
-            }
-            if (!handled) {
-                if (this.buffered_messages.length > 1000) {
-                    this.buffered_messages.shift();
-                }
-                console.debug(`Buffered message: ${message}`);
-                this.buffered_messages.push(parsed);
-            }
+            this.message_queue.enqueue(parsed);
+            // let handled = false;
+            // console.debug(`Sending to ${this.listeners.size} listeners`);
+            // for (const listener of this.listeners) {
+            //     handled = handled || listener(parsed);
+            // }
+            // if (!handled) {
+            //     if (this.buffered_messages.length > 1000) {
+            //         this.buffered_messages.shift();
+            //     }
+            //     console.debug(`Buffered message: ${message}`);
+            //     this.buffered_messages.push(parsed);
+            // }
         })();
     }
 

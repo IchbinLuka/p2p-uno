@@ -23,3 +23,15 @@ a:hover {
     align-items: center;
     flex-grow: 1;
 }
+
+.footer {
+    padding: 10px;
+    text-align: center;
+    border-top: 1px solid #dee2e607;
+    color: #6c757d;
+}
+
+.footer a {
+    color: inherit;
+    font-weight: normal;
+}

@@ -3,11 +3,11 @@
     flex-direction: row;
     align-items: center;
     --card-overlap: -50px;
-    padding: 8px;
+    padding: 4px;
+    padding-top: 14px;
     /* prevent the flex container from shrinking items unexpectedly */
     gap: 0;
     max-width: 95vw;
-    overflow: hidden;
 }
 
 /* Card wrapper: small vertical spacing is preserved, horizontal spacing comes from overlap */
@@ -32,16 +32,22 @@
 }
 
 /* Hover: lift the card, add soft shadow and bring it to front */
-.card-container:hover {
+.card-container-active:hover {
     transform: translateY(-10px);
     box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
     z-index: 500;
 }
 
 /* Active/click: slightly less lift for a tactile feel */
-.card-container:active {
+.card-container-active:active {
     transform: translateY(-6px);
     transition-duration: 120ms;
+}
+
+/* Grey out card a bit and change pointer */
+.card-container-unactive {
+    filter: grayscale(50%);
+    cursor: not-allowed;
 }
 
 .player-state-card {

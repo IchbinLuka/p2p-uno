@@ -7,7 +7,11 @@ import {
 } from "../src/model/serialization";
 import { SignManager } from "../src/model/signing";
 import type { PlayerGame } from "../src/model/types";
-import { MessageType, type DrawCardRequest } from "../src/model/connection";
+import {
+    MessageType,
+    type DrawCard,
+    type PlayerMessage,
+} from "../src/model/connection";
 
 describe("Test serialization + deserialization of messages", () => {
     it("serialization & deserialization", () => {
@@ -38,7 +42,7 @@ describe("Test serialization + deserialization of messages", () => {
             },
         };
 
-        const message: DrawCardRequest = {
+        const message: DrawCard = {
             type: MessageType.DRAW_CARD_REQUEST,
             initial_card: manager1.sampleCard(),
         };
