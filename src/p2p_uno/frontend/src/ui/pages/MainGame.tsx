@@ -228,22 +228,17 @@ function GameVis({
                     {state.own_cards.map((card: UICard) => {
                         const active = card_active(card.card_type);
                         return (
-                            <>
-                                <div
-                                    key={card.uuid}
-                                    className={`card-container ${active ? "card-container-active" : "card-container-unactive"}`}
-                                    onClick={
-                                        active
-                                            ? () => on_card_clicked?.(card)
-                                            : undefined
-                                    }
-                                >
-                                    <Card
-                                        card={card.card_type}
-                                        active={active}
-                                    />
-                                </div>
-                            </>
+                            <div
+                                key={card.uuid}
+                                className={`card-container ${active ? "card-container-active" : "card-container-unactive"}`}
+                                onClick={
+                                    active
+                                        ? () => on_card_clicked?.(card)
+                                        : undefined
+                                }
+                            >
+                                <Card card={card.card_type} active={active} />
+                            </div>
                         );
                     })}
                 </div>
