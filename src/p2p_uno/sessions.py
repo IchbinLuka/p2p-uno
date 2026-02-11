@@ -13,21 +13,11 @@ from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from typing_extensions import Coroutine
 
 from p2p_uno.signatures import Verifier
+from p2p_uno.turn import IceServer, IceServerProvider
 from p2p_uno.util import decode_b64, encode_b64
 
 logger = logging.getLogger(__name__)
 
-
-class IceServer(pydantic.BaseModel):
-    urls: str | list[str]
-    credential: str | None = None
-    username: str | None = None
-
-
-ICE_SERVERS = [
-    IceServer(urls="stun:stun1.l.google.com:19302"),
-    IceServer(urls="stun:stun2.l.google.com:19302"),
-]
 
 app = FastAPI()
 
@@ -258,6 +248,9 @@ async def join_session(websocket: WebSocket, session_id: str):
     nonce = secrets.token_bytes(32)
     challenge_nonce = encode_b64(nonce)
     logger.debug(f"Generated challenge nonce {challenge_nonce}")
+    assert IceServerProvider.instance is not None, (
+        "ICE server provider is not initialized"
+    )
     await websocket.send_json(
         SessionInfoMessage(
             player_keys={
@@ -266,7 +259,7 @@ async def join_session(websocket: WebSocket, session_id: str):
                 if player.name != request.name
             },
             challenge_nonce=challenge_nonce,
-            ice_servers=ICE_SERVERS,
+            ice_servers=IceServerProvider.instance.get_ice_servers(player.name),
         ).model_dump()
     )
     logger.debug(f"Sent session info to {player.name}")

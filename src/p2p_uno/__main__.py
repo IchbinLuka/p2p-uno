@@ -4,21 +4,34 @@ import random
 import uuid
 
 import uvicorn
+import yaml
 from fastapi.middleware.cors import CORSMiddleware
 
 from p2p_uno.app import app
 from p2p_uno.sessions import SESSIONS, Session
+from p2p_uno.turn import IceServerProvider, TurnConfig
 from p2p_uno.util import setup_logging
 
 
-def debug_args():
-    parser = argparse.ArgumentParser()
+def http_args(parser: argparse.ArgumentParser):
+    parser.add_argument("--host", type=str, default="localhost")
+    parser.add_argument("--port", type=int, default=8080)
+
+
+def turn_args(parser: argparse.ArgumentParser):
+    parser.add_argument("--turn-config", type=str, required=False)
+
+
+def debug_args(parser: argparse.ArgumentParser):
     parser.add_argument("--fill-sessions", type=int, default=0)
-    return parser.parse_args()
 
 
 async def start_server():
-    args = debug_args()
+    parser = argparse.ArgumentParser()
+    turn_args(parser)
+    debug_args(parser)
+    http_args(parser)
+    args = parser.parse_args()
     for _ in range(args.fill_sessions):
         max_players = random.randint(3, 10)
         name = random.choice(["Alice", "Bob", "Charlie", "David", "Eve"])
@@ -29,6 +42,14 @@ async def start_server():
             max_players=max_players,
         )
         SESSIONS[str(session_id)] = session
+
+    if args.turn_config:
+        with open(args.turn_config, "r") as f:
+            turn_config = TurnConfig.model_validate(yaml.load(f, Loader=yaml.Loader))
+    else:
+        turn_config = None
+    # Initialize provider
+    IceServerProvider(turn_config)
 
     # TODO: This needs to be changed for production
     origins = ["*"]
@@ -41,7 +62,7 @@ async def start_server():
         allow_headers=["*"],
     )
 
-    config = uvicorn.Config(app)
+    config = uvicorn.Config(app, host=args.host, port=args.port)
     server = uvicorn.Server(config)
     await server.serve()
 
