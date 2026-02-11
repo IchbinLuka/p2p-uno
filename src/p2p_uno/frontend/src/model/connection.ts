@@ -190,6 +190,19 @@ export class ConnectionRouter {
     remove_listener(listener: MessageListener) {
         this.listeners.delete(listener);
     }
+
+    remove_connection(player: string) {
+        const connection = this.player_connections.find(
+            (conn) => conn.player === player,
+        );
+        if (connection) {
+            this.player_connections.splice(
+                this.player_connections.indexOf(connection),
+                1,
+            );
+            connection.channel.close();
+        }
+    }
 }
 
 function stringify_listeners(

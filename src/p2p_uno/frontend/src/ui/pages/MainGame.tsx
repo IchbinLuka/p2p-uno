@@ -8,6 +8,7 @@ import { useValueListenable } from "../utils";
 import { Button } from "antd";
 import LoadingIndicator from "../components/LoadingIndicator";
 import { useTranslation } from "react-i18next";
+import Timer from "../components/Timer";
 
 function MainGame({ game }: { game: GameRunning }) {
     const state = useValueListenable(game.state);
@@ -158,6 +159,20 @@ function GameVis({
         ["--card-overlap"]: `${-overlap}px`,
     };
 
+    // eslint-disable-next-line react-hooks/purity
+    const timer_end = state.timer_end ?? Date.now();
+
+    if (!(own_name in state.player_card_counts)) {
+        return (
+            <div>
+                <h1>
+                    You have been kicked. This may be an indication of a
+                    modified client.
+                </h1>
+            </div>
+        );
+    }
+
     return (
         <div
             style={{
@@ -189,18 +204,31 @@ function GameVis({
                 style={{
                     flexGrow: 1,
                     display: "flex",
-                    flexDirection: "column",
+                    flexDirection: "row",
                     alignItems: "center",
                     justifyContent: "center",
                     width: "100%",
                 }}
             >
                 {state.top_card != null && (
-                    <>
+                    <div>
                         <Card card={state.top_card} />
-                        <h3>Current Card</h3>
-                    </>
+                        <h3>{t("session.current_card")}</h3>
+                    </div>
                 )}
+                <div style={{ marginLeft: 20 }}>
+                    {state.current_player === own_name && (
+                        <h2 style={{ margin: 0, marginBottom: 70 }}>
+                            {t("session.your_turn")}
+                        </h2>
+                    )}
+                    <h2 style={{ margin: 0, fontWeight: "normal" }}>
+                        {t("session.time_left")}
+                    </h2>
+                    <h2 style={{ margin: 0 }}>
+                        <Timer end_time={timer_end} />
+                    </h2>
+                </div>
             </div>
             <div style={{ height: 25 }}>
                 {state.current_player === own_name && (
@@ -273,6 +301,8 @@ function PlayerState({
 export function GameVisTest() {
     const [state] = useState<GameState>({
         current_player: "alice",
+        // eslint-disable-next-line react-hooks/purity
+        timer_end: Date.now() + 15_000,
         player_card_counts: {
             bob: 7,
             alice: 5,

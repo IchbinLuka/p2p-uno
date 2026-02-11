@@ -1,10 +1,16 @@
+import type { KickVote } from "./connection";
+
+export type PlayerName = string;
+
 export interface Player {
-    name: string;
+    name: PlayerName;
     public_key: Uint8Array;
 }
 
 export interface PlayerGame extends Player {
-    cards: { [key: string]: UnknownCard };
+    cards: Record<PlayerName, UnknownCard>;
+    kick_votes: Record<PlayerName, KickVote>;
+    kicked: boolean;
 }
 
 function get_all_cards() {

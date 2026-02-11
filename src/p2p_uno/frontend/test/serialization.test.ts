@@ -34,11 +34,15 @@ describe("Test serialization + deserialization of messages", () => {
                 name: "bob",
                 public_key: manager1.publicKeyExported,
                 cards: {},
+                kick_votes: {},
+                kicked: false,
             },
             alice: {
                 name: "alice",
                 public_key: manager2.publicKeyExported,
                 cards: {},
+                kick_votes: {},
+                kicked: false,
             },
         };
 

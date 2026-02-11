@@ -12,12 +12,16 @@
         "waiting": "Warten",
         "no_sessions": "Keine Sitzungen gefunden",
         "skip_turn": "Aussetzen",
-        "draw_card": "Karte Ziehen"
+        "draw_card": "Karte Ziehen",
+        "time_left": "Zeit übrig:",
+        "your_turn": "Du bist dran!",
+        "current_card": "Aktuelle Karte"
     },
     "end_screen": {
         "game_over": "Spiel vorbei!",
         "player_wins": "{{name}} gewinnt!",
-        "back_to_home": "Zurück zum Start"
+        "back_to_home": "Zurück zum Start",
+        "game_aborted": "Spiel abgebrochen!"
     },
     "player": {
         "name": "Spielername",

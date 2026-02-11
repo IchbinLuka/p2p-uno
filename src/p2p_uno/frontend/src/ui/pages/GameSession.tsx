@@ -11,6 +11,7 @@ import WaitLobby from "./WaitLobby";
 import { useValueListenable } from "../utils";
 import MainGame from "./MainGame";
 import crown_logo from "../../assets/crown.svg";
+import cancel_logo from "../../assets/cancel_button.svg";
 import PageTitle from "../components/PageTitle";
 import BackButton from "../components/BackButton";
 import { useTranslation } from "react-i18next";
@@ -91,12 +92,21 @@ export function FinishPage({ finished }: { finished: GameFinished }) {
                     justifyContent: "space-evenly",
                 }}
             >
-                <div>
-                    <img src={crown_logo} width={200} height="auto" />
-                    <h2>
-                        {t("end_screen.player_wins", { name: finished.winner })}
-                    </h2>
-                </div>
+                {finished.aborted ? (
+                    <div>
+                        <img src={cancel_logo} width={200} height="auto" />
+                        <h2>{t("end_screen.game_aborted")}</h2>
+                    </div>
+                ) : (
+                    <div>
+                        <img src={crown_logo} width={200} height="auto" />
+                        <h2>
+                            {t("end_screen.player_wins", {
+                                name: finished.winner,
+                            })}
+                        </h2>
+                    </div>
+                )}
                 <BackButton dest="/">{t("end_screen.back_to_home")}</BackButton>
             </div>
         </Page>

@@ -3,6 +3,7 @@ import {
     MessageType,
     type DrawCard,
     type FinalizeCardDraw,
+    type KickVote,
     type Message,
     type PlayCard,
     type SignCardMessage,
@@ -11,7 +12,9 @@ import {
 import {
     DrawingCard,
     GameManager,
+    PlayerTimeout,
     Preparing,
+    TimeoutPhase,
     WaitingPhase,
     type GamePhase,
 } from "./game";
@@ -34,22 +37,27 @@ export interface GameState {
     player_card_counts: Record<string, number>;
     own_cards: UICard[];
     top_card: CardType | null;
+    timer_end?: number;
 }
 
 export type GameStage = GameRunning | Waiting | GameFinished;
 
 export type PreparingState = "preparing";
 
+const TIMEOUT_BUFFER = 5000;
+
 export class GameRunning {
     private readonly game_manager: GameManager;
     private readonly connection_router: ConnectionRouter;
     private readonly sign_manager: SignManager;
+    private _current_timeout: PlayerTimeout | null = null;
+    private force_skip_timeout: PlayerTimeout | null = null;
     // @ts-expect-error: This attribute is currently not accessed
     private message_job: Promise<void> | undefined;
     readonly own_name: string;
     private readonly player_order: string[];
     private readonly self_idx: number;
-    private readonly on_finish: (winner: string) => void;
+    private readonly on_finish: (winner: string, aborted: boolean) => void;
     own_cards: Record<string, KnownCard> = {};
 
     state: ValueNotifier<GameState | PreparingState> = new ValueNotifier<
@@ -60,7 +68,7 @@ export class GameRunning {
         connection_result: ConnectionResult,
         sign_manager: SignManager,
         own_name: string,
-        on_finish: (winner: string) => void,
+        on_finish: (winner: string, aborted: boolean) => void,
     ) {
         this.on_finish = on_finish;
         this.own_name = own_name;
@@ -71,6 +79,8 @@ export class GameRunning {
                 cards: {},
                 name: player.name,
                 public_key: player.public_key,
+                kicked: false,
+                kick_votes: {},
             };
         }
         this.connection_router = new ConnectionRouter(
@@ -121,6 +131,31 @@ export class GameRunning {
     }
 
     private async handle_phase(phase: GamePhase) {
+        if (this._current_timeout != null) {
+            this._current_timeout.abort();
+            this._current_timeout = null;
+        }
+        if (this.force_skip_timeout != null) {
+            this.force_skip_timeout.abort();
+            this.force_skip_timeout = null;
+        }
+        if (phase instanceof TimeoutPhase) {
+            const on_timeout = () => {
+                console.error(`Player ${phase.timeout_player} timed out`);
+                this.send_message({
+                    type: MessageType.KICK_VOTE,
+                    player: this.player_order[phase.timeout_player],
+                    reason: "timeout",
+                } satisfies KickVote).catch((error) => {
+                    console.error(`Failed to send kick vote message: ${error}`);
+                });
+            };
+            this._current_timeout = new PlayerTimeout(
+                phase.timeout_player,
+                phase.timeout,
+                on_timeout,
+            );
+        }
         if (phase instanceof DrawingCard) {
             if (phase.next_player !== this.own_name) return;
             const signed = await this.sign_manager.signCard(
@@ -156,11 +191,24 @@ export class GameRunning {
             };
             await this.send_message(message);
         } else if (phase instanceof WaitingPhase) {
+            if (phase.current_player_idx === this.self_idx) {
+                // Skip so we don't get kicked
+                this.force_skip_timeout = new PlayerTimeout(
+                    this.self_idx,
+                    phase.timeout - TIMEOUT_BUFFER,
+                    () => {
+                        this.skip_turn().catch(() => {
+                            console.error("Failed to skip turn");
+                        });
+                    },
+                );
+            }
             this.state.value = {
                 current_player: this.player_order[phase.current_player_idx],
                 player_card_counts: phase.player_card_counts,
                 own_cards: Object.values(this.own_cards),
                 top_card: phase.top_card,
+                timer_end: phase.timeout + Date.now() - TIMEOUT_BUFFER,
             };
             if (
                 phase.top_card == null &&
@@ -171,7 +219,7 @@ export class GameRunning {
             }
         } else {
             phase satisfies GameFinished;
-            this.on_finish(phase.winner);
+            this.on_finish(phase.winner, phase.aborted);
         }
     }
 
@@ -222,9 +270,11 @@ export class GameRunning {
 
 export class GameFinished {
     readonly winner: string;
+    readonly aborted: boolean;
 
-    constructor(winner: string) {
+    constructor(winner: string, aborted: boolean) {
         this.winner = winner;
+        this.aborted = aborted;
     }
 }
 
@@ -319,8 +369,8 @@ export class GameModel {
                 result,
                 this.sign_manager,
                 player_name,
-                (winner) => {
-                    this.game_phase.value = new GameFinished(winner);
+                (winner, aborted) => {
+                    this.game_phase.value = new GameFinished(winner, aborted);
                 },
             );
             this.game_phase.value = running;

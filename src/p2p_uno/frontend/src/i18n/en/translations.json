@@ -12,12 +12,16 @@
         "waiting": "Waiting Lobby",
         "no_sessions": "No sessions found",
         "skip_turn": "Skip Turn",
-        "draw_card": "Draw Card"
+        "draw_card": "Draw Card",
+        "time_left": "Time left:",
+        "your_turn": "It's your turn!",
+        "current_card": "Current Card"
     },
     "end_screen": {
         "game_over": "Game Over!",
         "player_wins": "{{name}} wins!",
-        "back_to_home": "Back to Home"
+        "back_to_home": "Back to Home",
+        "game_aborted": "Game aborted!"
     },
     "player": {
         "name": "Player Name",

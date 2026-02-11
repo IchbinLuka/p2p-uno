@@ -30,4 +30,13 @@ export class Semaphore {
             next();
         }
     }
+
+    async with<T>(fn: () => Promise<T>): Promise<T> {
+        await this.acquire();
+        try {
+            return fn();
+        } finally {
+            this.release();
+        }
+    }
 }
