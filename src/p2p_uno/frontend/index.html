@@ -5,6 +5,12 @@
         <link rel="icon" type="image/svg+xml" href="/vite.svg" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>frontend</title>
+        <script>
+            const mm_server_url = "{{mm_server_url}}";
+            // If the string is unchanged, we are not using a templating engine
+            export var MATCHMAKING_SERVER =
+                mm_server_url === "{{mm_server_url}}" ? null : mm_server_url;
+        </script>
     </head>
     <body>
         <div id="root"></div>

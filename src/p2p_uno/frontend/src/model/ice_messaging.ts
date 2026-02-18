@@ -1,3 +1,4 @@
+import type { API } from "./api";
 import { b64_to_uint8, uint8_to_b64 } from "./serialization";
 import type { SignManager } from "./signing";
 
@@ -78,10 +79,6 @@ export interface ConnectionResult {
     players: PlayerConnection[];
 }
 
-interface SessionCreateResponse {
-    session_id: string;
-}
-
 class WebsocketError extends Error {
     event: Event;
     constructor(event: Event) {
@@ -93,18 +90,6 @@ class WebsocketError extends Error {
         // eslint-disable-next-line @typescript-eslint/no-base-to-string
         return `WebsocketError: ${this.event.toString()}`;
     }
-}
-
-const HOST = "localhost:8000";
-
-export async function create_session(): Promise<string> {
-    const response = await window.fetch(`http://${HOST}/sessions`, {
-        method: "POST",
-    });
-    const { session_id } = JSON.parse(
-        await response.text(),
-    ) as SessionCreateResponse;
-    return session_id;
 }
 
 export interface PlayerStatus {
@@ -322,12 +307,14 @@ export class ConnectionEstablishHandler {
     static async create(
         name: string,
         session_id: string,
+        api: API,
         sign_manager: SignManager,
         on_update: (players: PlayerStatus[]) => void,
         on_session_start: (result: ConnectionResult) => void,
     ): Promise<ConnectionEstablishHandler> {
         console.debug("Opening websocket");
-        const websocket = new WebSocket(`ws://${HOST}/sessions/${session_id}`);
+        const host = await api.hostname;
+        const websocket = new WebSocket(`ws://${host}/sessions/${session_id}`);
         // Wait until websocket is open
         await new Promise<void>((resolve, reject) => {
             websocket.onopen = () => resolve();

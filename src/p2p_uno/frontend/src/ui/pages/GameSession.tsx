@@ -1,6 +1,6 @@
 import { useParams, useSearchParams } from "react-router-dom";
 import Page from "../components/Page";
-import { useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import {
     GameFinished,
     GameModel,
@@ -16,10 +16,12 @@ import PageTitle from "../components/PageTitle";
 import BackButton from "../components/BackButton";
 import { useTranslation } from "react-i18next";
 import LoadingIndicator from "../components/LoadingIndicator";
+import { APIContext } from "../context";
 
 function GameSession() {
     const params = useParams();
     const [query_params, _] = useSearchParams();
+    const api = useContext(APIContext)!;
 
     const is_host = query_params.get("is_host") === "true";
     const player_name = query_params.get("name")!;
@@ -39,7 +41,7 @@ function GameSession() {
 
         const create_game = async () => {
             console.log("Creating game...");
-            const game = await GameModel.create();
+            const game = await GameModel.create(api);
             game.join_session(player_name, params.session_id!);
             set_game(game);
         };
@@ -47,7 +49,7 @@ function GameSession() {
             set_error(error.message);
             console.error(error);
         });
-    }, [params.session_id, is_host, player_name]);
+    }, [params.session_id, is_host, player_name, api]);
 
     const phase = useValueListenable(game?.game_phase);
 

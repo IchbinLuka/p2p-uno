@@ -12,7 +12,7 @@ import Credits from "./ui/pages/Credits";
 import { GameFinished } from "./model/model";
 
 function App() {
-    const [api, _] = useState(new API("http://localhost:8000"));
+    const [api, _] = useState(new API());
     return (
         <ConfigProvider theme={{ algorithm: theme.darkAlgorithm }}>
             <APIContext.Provider value={api}>
@@ -32,7 +32,7 @@ function App() {
                             path="/finish"
                             element={
                                 <FinishPage
-                                    finished={new GameFinished("Bob")}
+                                    finished={new GameFinished("Bob", false)}
                                 />
                             }
                         />

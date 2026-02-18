@@ -1,3 +1,4 @@
+import type { API } from "./api";
 import {
     ConnectionRouter,
     MessageType,
@@ -292,6 +293,7 @@ export class Waiting {
     constructor(
         player_name: string,
         session_id: string,
+        api: API,
         sign_manager: SignManager,
         on_game_start: (result: ConnectionResult) => void,
         on_error: (error: Error) => void,
@@ -311,6 +313,7 @@ export class Waiting {
         ConnectionEstablishHandler.create(
             player_name,
             session_id,
+            api,
             sign_manager,
             on_update,
             on_game_start,
@@ -350,17 +353,19 @@ export class Waiting {
 
 export class GameModel {
     private sign_manager: SignManager;
+    private api: API;
 
     game_phase: ValueNotifier<GameStage | null> =
         new ValueNotifier<GameStage | null>(null);
 
-    private constructor(sign_manager: SignManager) {
+    private constructor(sign_manager: SignManager, api: API) {
         this.sign_manager = sign_manager;
+        this.api = api;
     }
 
-    static async create() {
+    static async create(api: API) {
         const sign_manager = await SignManager.init();
-        return new GameModel(sign_manager);
+        return new GameModel(sign_manager, api);
     }
 
     join_session(player_name: string, session_id: string) {
@@ -382,6 +387,7 @@ export class GameModel {
         this.game_phase.value = new Waiting(
             player_name,
             session_id,
+            this.api,
             this.sign_manager,
             on_game_start,
             on_error,

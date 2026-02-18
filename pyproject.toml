@@ -12,6 +12,7 @@ dependencies = [
     "ecdsa>=0.19.1",
     "fastapi>=0.123.0",
     "httpx>=0.28.1",
+    "jinja2>=3.1.6",
     "pycryptodome>=3.23.0",
     "pytest>=9.0.1",
     "pyyaml>=6.0.3",
@@ -21,7 +22,8 @@ dependencies = [
 ]
 
 [project.scripts]
-p2p-uno = "p2p_uno.__main__:main"
+uno-mms = "p2p_uno.__main__:main"
+uno-frontend = "p2p_uno.frontend:main"
 
 [build-system]
 requires = ["hatchling"]

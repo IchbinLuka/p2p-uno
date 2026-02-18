@@ -15,7 +15,7 @@ from p2p_uno.util import setup_logging
 
 def http_args(parser: argparse.ArgumentParser):
     parser.add_argument("--host", type=str, default="localhost")
-    parser.add_argument("--port", type=int, default=8080)
+    parser.add_argument("--port", type=int, default=8000)
 
 
 def turn_args(parser: argparse.ArgumentParser):

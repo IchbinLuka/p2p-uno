@@ -10,5 +10,4 @@ async def root():
     return {"message": "Hello, World!"}
 
 
-app.mount("/frontend", frontend.app)
 app.mount("/sessions", sessions.app)

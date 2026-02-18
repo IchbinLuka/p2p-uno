@@ -15,14 +15,17 @@ export interface Session {
 }
 
 export class API {
-    hostname: string;
-    constructor(hostname: string) {
-        this.hostname = hostname;
+    readonly hostname: Promise<string>;
+    constructor() {
+        this.hostname = window
+            .fetch("/mm_server")
+            .then((r) => r.json())
+            .then((j) => (j as { mm_server_url: string }).mm_server_url);
     }
 
     async fetchSessions(skip: number, limit: number): Promise<Session[]> {
         const response = await fetch(
-            `${this.hostname}/sessions?skip=${skip}&limit=${limit}`,
+            `${await this.hostname}/sessions?skip=${skip}&limit=${limit}`,
         );
         if (response.status != 200) {
             throw new Error(`Failed to fetch sessions: ${response.status}`);
@@ -31,7 +34,7 @@ export class API {
     }
 
     async createSession(name: string, max_players: number): Promise<Session> {
-        const response = await fetch(`${this.hostname}/sessions`, {
+        const response = await fetch(`${await this.hostname}/sessions`, {
             method: "POST",
             body: JSON.stringify({ session_name: name, max_players }),
             headers: {
