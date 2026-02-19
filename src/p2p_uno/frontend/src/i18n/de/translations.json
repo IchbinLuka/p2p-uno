@@ -15,7 +15,8 @@
         "draw_card": "Karte Ziehen",
         "time_left": "Zeit übrig:",
         "your_turn": "Du bist dran!",
-        "current_card": "Aktuelle Karte"
+        "current_card": "Aktuelle Karte",
+        "no_matchmaking_server_available": "Kein Matchmaking Server verfügbar"
     },
     "end_screen": {
         "game_over": "Spiel vorbei!",

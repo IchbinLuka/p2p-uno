@@ -1,0 +1,8 @@
+local1:
+    name: Local 1
+    url: localhost:8000
+    secure: false
+local2:
+    name: Local 2
+    url: localhost:8001
+    secure: true

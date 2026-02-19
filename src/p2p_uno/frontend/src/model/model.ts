@@ -1,4 +1,4 @@
-import type { API } from "./api";
+import type { MMServer } from "./api";
 import {
     ConnectionRouter,
     MessageType,
@@ -294,7 +294,7 @@ export class Waiting {
     constructor(
         player_name: string,
         session_id: string,
-        api: API,
+        server: MMServer,
         sign_manager: SignManager,
         on_game_start: (result: ConnectionResult) => void,
         on_error: (error: Error) => void,
@@ -314,7 +314,7 @@ export class Waiting {
         ConnectionEstablishHandler.create(
             player_name,
             session_id,
-            api,
+            server,
             sign_manager,
             on_update,
             on_game_start,
@@ -354,19 +354,19 @@ export class Waiting {
 
 export class GameModel {
     private sign_manager: SignManager;
-    private api: API;
+    private server: MMServer;
 
     game_phase: ValueNotifier<GameStage | null> =
         new ValueNotifier<GameStage | null>(null);
 
-    private constructor(sign_manager: SignManager, api: API) {
+    private constructor(sign_manager: SignManager, server: MMServer) {
         this.sign_manager = sign_manager;
-        this.api = api;
+        this.server = server;
     }
 
-    static async create(api: API) {
+    static async create(server: MMServer) {
         const sign_manager = await SignManager.init();
-        return new GameModel(sign_manager, api);
+        return new GameModel(sign_manager, server);
     }
 
     join_session(player_name: string, session_id: string) {
@@ -388,7 +388,7 @@ export class GameModel {
         this.game_phase.value = new Waiting(
             player_name,
             session_id,
-            this.api,
+            this.server,
             this.sign_manager,
             on_game_start,
             on_error,

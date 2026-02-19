@@ -1,6 +1,6 @@
 import { useContext, useState } from "react";
 import { APIContext } from "../context";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Button, Form, Input, InputNumber } from "antd";
 import BackButton from "../components/BackButton";
 import Page from "../components/Page";
@@ -13,8 +13,10 @@ interface FormProps {
 }
 
 function CreateSession() {
+    const params = useParams();
     const { t } = useTranslation();
     const api = useContext(APIContext)!;
+    const server = api.mm_servers[params.mm_server!];
     const navigate = useNavigate();
     const [query_params, _] = useSearchParams();
 
@@ -31,12 +33,12 @@ function CreateSession() {
             return;
         }
         void (async () => {
-            const session = await api.createSession(
+            const session = await server.createSession(
                 data.name,
                 data.max_players,
             );
             await navigate(
-                `/session/${session.session_id}?is_host=true&name=${player_name}`,
+                `/session/${params.mm_server!}/${session.session_id}?is_host=true&name=${player_name}`,
             );
         })().catch((error) => setError((error as { message: string }).message));
         // try {

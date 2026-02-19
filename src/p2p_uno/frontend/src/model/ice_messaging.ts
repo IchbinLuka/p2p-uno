@@ -1,4 +1,4 @@
-import type { API } from "./api";
+import type { MMServer } from "./api";
 import { b64_to_uint8, uint8_to_b64 } from "./serialization";
 import type { SignManager } from "./signing";
 import type { CardType } from "./types";
@@ -310,14 +310,15 @@ export class ConnectionEstablishHandler {
     static async create(
         name: string,
         session_id: string,
-        api: API,
+        server: MMServer,
         sign_manager: SignManager,
         on_update: (players: PlayerStatus[]) => void,
         on_session_start: (result: ConnectionResult) => void,
     ): Promise<ConnectionEstablishHandler> {
         console.debug("Opening websocket");
-        const host = (await api.hostname).split("://")[1];
-        const websocket = new WebSocket(`ws://${host}/sessions/${session_id}`);
+        const websocket = new WebSocket(
+            `${server.wsUrl}/sessions/${session_id}`,
+        );
         // Wait until websocket is open
         await new Promise<void>((resolve, reject) => {
             websocket.onopen = () => resolve();

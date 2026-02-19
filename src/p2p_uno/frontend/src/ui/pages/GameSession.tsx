@@ -32,6 +32,11 @@ function GameSession() {
     const createdFor = useRef<string | null>(null);
 
     useEffect(() => {
+        if (params.mm_server == null) {
+            console.error("Missing matchmaking server");
+            return;
+        }
+        const server = api.mm_servers[params.mm_server];
         if (params.session_id == null) {
             console.error("Missing session ID");
             return;
@@ -41,7 +46,7 @@ function GameSession() {
 
         const create_game = async () => {
             console.log("Creating game...");
-            const game = await GameModel.create(api);
+            const game = await GameModel.create(server);
             game.join_session(player_name, params.session_id!);
             set_game(game);
         };
@@ -49,7 +54,7 @@ function GameSession() {
             set_error(error.message);
             console.error(error);
         });
-    }, [params.session_id, is_host, player_name, api]);
+    }, [params.session_id, is_host, player_name, api, params.mm_server]);
 
     const phase = useValueListenable(game?.game_phase);
 
