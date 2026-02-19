@@ -104,6 +104,7 @@ export class GameRunning {
             this.player_order,
             (_) => {},
             players,
+            connection_result.top_card,
         );
     }
 
@@ -211,13 +212,13 @@ export class GameRunning {
                 top_card: phase.top_card,
                 timer_end: phase.timeout + Date.now() - TIMEOUT_BUFFER,
             };
-            if (
-                phase.top_card == null &&
-                phase.current_player_idx === this.self_idx
-            ) {
-                // We are still in the preparing phase, play out a card without confirmation
-                await this.play_card(Object.values(this.own_cards)[0]);
-            }
+            // if (
+            //     phase.top_card == null &&
+            //     phase.current_player_idx === this.self_idx
+            // ) {
+            //     // We are still in the preparing phase, play out a card without confirmation
+            //     await this.play_card(Object.values(this.own_cards)[0]);
+            // }
         } else {
             phase satisfies GameFinished;
             this.on_finish(phase.winner, phase.aborted);

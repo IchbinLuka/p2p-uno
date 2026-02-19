@@ -2,6 +2,7 @@ import asyncio
 import itertools
 import json
 import logging
+import random
 import secrets
 import uuid
 from dataclasses import dataclass
@@ -109,6 +110,10 @@ class Session:
                     for player in self.players.values()
                     if player.accepted
                 ],
+                "top_card": {
+                    "color": random.choice(["red", "green", "blue", "yellow"]),
+                    "number": random.randint(0, 9),
+                },
                 "type": "lobbyend",
             }
         )

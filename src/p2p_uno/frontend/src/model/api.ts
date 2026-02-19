@@ -17,10 +17,14 @@ export interface Session {
 export class API {
     readonly hostname: Promise<string>;
     constructor() {
-        this.hostname = window
-            .fetch("/mm_server")
-            .then((r) => r.json())
-            .then((j) => (j as { mm_server_url: string }).mm_server_url);
+        if (import.meta.env.DEV) {
+            this.hostname = Promise.resolve("http://localhost:8000");
+        } else {
+            this.hostname = window
+                .fetch("/mm_server")
+                .then((r) => r.json())
+                .then((j) => (j as { mm_server_url: string }).mm_server_url);
+        }
     }
 
     async fetchSessions(skip: number, limit: number): Promise<Session[]> {

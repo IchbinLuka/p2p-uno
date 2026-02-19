@@ -51,12 +51,12 @@ export class DrawingCard extends TimeoutPhase {
 export class WaitingPhase extends TimeoutPhase {
     current_player_idx: number;
     player_card_counts: Record<string, number>;
-    top_card: CardType | null;
+    top_card: CardType;
 
     constructor(
         current_player: number,
         player_card_counts: Record<string, number>,
-        top_card: CardType | null,
+        top_card: CardType,
     ) {
         super();
         this.current_player_idx = current_player;
@@ -164,7 +164,7 @@ export class GameManager {
     private readonly sign_manager: SignManager;
     private readonly players: Record<string, PlayerGame>;
     private readonly player_order: string[];
-    private top_card: CardType | null = null;
+    private top_card: CardType;
     private phase_listeners: Set<(phase: GamePhase) => void> = new Set();
     readonly phase_queue: AsyncQueue<GamePhase> = new AsyncQueue();
     private readonly message_mutex: Semaphore = new Semaphore(1);
@@ -174,12 +174,13 @@ export class GameManager {
         player_order: string[],
         on_violation: (violation: PlayerError) => void,
         players: Record<string, PlayerGame>,
+        top_card: CardType,
     ) {
         this.sign_manager = sign_manager;
         this.players = players;
         this.phase = new Preparing(0);
         this.player_order = player_order;
-        this.top_card = null;
+        this.top_card = top_card;
         this.on_violation = on_violation;
     }
 
@@ -246,10 +247,7 @@ export class GameManager {
             console.debug(`Finalized ${final_card.uuid} for ${message.player}`);
             if (phase.preparing) {
                 const player_idx = this.player_order.indexOf(message.player);
-                const card_count =
-                    player_idx == 0
-                        ? INITIAL_CARD_COUNT + 1
-                        : INITIAL_CARD_COUNT;
+                const card_count = INITIAL_CARD_COUNT;
                 if (
                     Object.keys(this.players[message.player].cards).length <
                     card_count
@@ -264,7 +262,7 @@ export class GameManager {
                     return new WaitingPhase(
                         0,
                         this.get_player_card_counts(),
-                        null,
+                        this.top_card,
                     );
                 }
             } else {

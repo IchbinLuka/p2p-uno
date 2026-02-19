@@ -1,6 +1,7 @@
 import type { API } from "./api";
 import { b64_to_uint8, uint8_to_b64 } from "./serialization";
 import type { SignManager } from "./signing";
+import type { CardType } from "./types";
 
 enum IceType {
     Candidate = "candidate",
@@ -12,6 +13,7 @@ type WebsocketMessage = LobbyEnd | IncomingIce;
 
 interface LobbyEnd {
     verified_players: { name: string; key: string }[];
+    top_card: CardType;
     type: "lobbyend";
 }
 
@@ -77,6 +79,7 @@ export interface PlayerConnection {
 
 export interface ConnectionResult {
     players: PlayerConnection[];
+    top_card: CardType;
 }
 
 class WebsocketError extends Error {
@@ -239,7 +242,7 @@ export class ConnectionEstablishHandler {
             });
         }
 
-        this.on_finished({ players: result });
+        this.on_finished({ players: result, top_card: end_msg.top_card });
     }
 
     private async on_message(msg: WebsocketMessage) {
