@@ -2,7 +2,9 @@ local1:
     name: Local 1
     url: localhost:8000
     secure: false
+    public_key: ...
 local2:
     name: Local 2
     url: localhost:8001
     secure: true
+    public_key: ...

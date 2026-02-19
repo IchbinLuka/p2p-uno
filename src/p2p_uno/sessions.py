@@ -13,14 +13,11 @@ import pydantic
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from typing_extensions import Coroutine
 
-from p2p_uno.signatures import Verifier
+from p2p_uno.signatures import HandleSigner, Verifier
 from p2p_uno.turn import IceServer, IceServerProvider
 from p2p_uno.util import decode_b64, encode_b64
 
 logger = logging.getLogger(__name__)
-
-
-app = FastAPI()
 
 
 @dataclass
@@ -102,21 +99,19 @@ class Session:
             raise PlayerNotFound(recipient)
         await player.on_ice_candidate(sender, payload, ice_type)
 
-    async def start(self):
-        end_message = json.dumps(
-            {
-                "verified_players": [
-                    {"name": player.name, "key": encode_b64(player.public_key)}
-                    for player in self.players.values()
-                    if player.accepted
-                ],
-                "top_card": {
-                    "color": random.choice(["red", "green", "blue", "yellow"]),
-                    "number": random.randint(0, 9),
-                },
-                "type": "lobbyend",
-            }
-        )
+    async def start(self, handle_signer: HandleSigner):
+        handle = {
+            "verified_players": [
+                {"name": player.name, "key": encode_b64(player.public_key)}
+                for player in self.players.values()
+                if player.accepted
+            ],
+            "top_card": {
+                "color": random.choice(["red", "green", "blue", "yellow"]),
+                "number": random.randint(0, 9),
+            },
+        }
+        end_message = handle_signer.sign_handle(handle).model_dump_json()
         self.started = True
         await asyncio.gather(
             *[
@@ -139,49 +134,6 @@ class SessionRepr(pydantic.BaseModel):
 class SessionCreate(pydantic.BaseModel):
     session_name: str
     max_players: int
-
-
-@app.post("/")
-async def create_session(body: SessionCreate):
-    session_id = uuid.uuid4()
-    session = Session(
-        session_id=str(session_id),
-        name=body.session_name,
-        max_players=body.max_players,
-    )
-    SESSIONS[str(session_id)] = session
-    logger.debug(f"Created session {session_id}")
-    return SessionRepr(
-        session_id=str(session_id),
-        session_name=body.session_name,
-        player_count=0,
-        max_players=body.max_players,
-    )
-
-
-@app.get("/")
-async def get_sessions(skip: int, limit: int) -> list[SessionRepr]:
-    limit = min(limit, 100)
-    return [
-        SessionRepr(
-            session_id=session_id,
-            session_name=session.name,
-            player_count=len(session.players),
-            max_players=session.max_players,
-        )
-        for session_id, session in itertools.islice(
-            SESSIONS.items(), skip, skip + limit
-        )
-        if session.player_count() < session.max_players and not session.started
-    ]
-
-
-@app.get("/{session_id}/available")
-async def name_available(name: str, session_id: str):
-    session = SESSIONS.get(session_id)
-    if session is None:
-        raise HTTPException(status_code=404, detail="Session not found")
-    return {"available": name.strip() in session.players}
 
 
 class PlayerMessage(pydantic.BaseModel):
@@ -216,95 +168,140 @@ class ChallengeProofMessage(pydantic.BaseModel):
     player_payloads: dict[str, str]
 
 
-@app.websocket("/{session_id}")
-async def join_session(websocket: WebSocket, session_id: str):
-    session = SESSIONS.get(session_id)
-    if session is None:
-        logger.error(f"Session {session_id} not found")
-        await websocket.close(code=1008)
-        return
-    await websocket.accept()
-    request = JoinMessage.model_validate(await websocket.receive_json())
-    logger.debug(f"Player {request.name} joined session {session_id}")
+def create_app(signer: HandleSigner, ice_servers: IceServerProvider):
+    app = FastAPI()
 
-    async def on_message(sender: str, message: dict[str, Any], ice_type: str):
-        logger.debug(f"Received message from {sender}: {message}")
-        await websocket.send_json(
-            OutgoingIce(
-                sender=sender,
-                payload=message,
-                ice_type=ice_type,
-            ).model_dump()
+    @app.post("/")
+    async def create_session(body: SessionCreate):
+        session_id = uuid.uuid4()
+        session = Session(
+            session_id=str(session_id),
+            name=body.session_name,
+            max_players=body.max_players,
+        )
+        SESSIONS[str(session_id)] = session
+        logger.debug(f"Created session {session_id}")
+        return SessionRepr(
+            session_id=str(session_id),
+            session_name=body.session_name,
+            player_count=0,
+            max_players=body.max_players,
         )
 
-    public_key = decode_b64(request.public_key)
-    verifier = Verifier(public_key)
-    player = Player(
-        name=request.name.strip(),
-        public_key=public_key,
-        # First player should be automatically accepted
-        accepted=session.player_count() == 0,
-        websocket=websocket,
-        on_ice_candidate=on_message,
-        verifier=verifier,
-    )
-    session.add_player(player)
-    logger.debug(f"Added player {player} to session")
-    nonce = secrets.token_bytes(32)
-    challenge_nonce = encode_b64(nonce)
-    logger.debug(f"Generated challenge nonce {challenge_nonce}")
-    assert IceServerProvider.instance is not None, (
-        "ICE server provider is not initialized"
-    )
-    await websocket.send_json(
-        SessionInfoMessage(
-            player_keys={
-                player.name: encode_b64(player.public_key)
-                for player in session.get_players()
-                if player.name != request.name
-            },
-            challenge_nonce=challenge_nonce,
-            ice_servers=IceServerProvider.instance.get_ice_servers(player.name),
-        ).model_dump()
-    )
-    logger.debug(f"Sent session info to {player.name}")
+    @app.get("/")
+    async def get_sessions(skip: int, limit: int) -> list[SessionRepr]:
+        limit = min(limit, 100)
+        return [
+            SessionRepr(
+                session_id=session_id,
+                session_name=session.name,
+                player_count=len(session.players),
+                max_players=session.max_players,
+            )
+            for session_id, session in itertools.islice(
+                SESSIONS.items(), skip, skip + limit
+            )
+            if session.player_count() < session.max_players and not session.started
+        ]
 
-    try:
-        while True:
-            message = await websocket.receive_json()
-            logger.debug(f"Received message from {player.name}: {message}")
-            if message["type"] == "ice":
-                ice_msg = IncomingIce.model_validate(message)
-                await session.send_message(
-                    request.name,
-                    ice_msg.recipient,
-                    ice_msg.payload,
-                    ice_msg.ice_type,
-                )
-            elif message["type"] == "proof":
-                proof = ChallengeProofMessage.model_validate(message)
-                try:
-                    verified = session.verify_proof(
+    @app.get("/{session_id}/available")
+    async def name_available(name: str, session_id: str):
+        session = SESSIONS.get(session_id)
+        if session is None:
+            raise HTTPException(status_code=404, detail="Session not found")
+        return {"available": name.strip() in session.players}
+
+    @app.websocket("/{session_id}")
+    async def join_session(websocket: WebSocket, session_id: str):
+        session = SESSIONS.get(session_id)
+        if session is None:
+            logger.error(f"Session {session_id} not found")
+            await websocket.close(code=1008)
+            return
+        await websocket.accept()
+        request = JoinMessage.model_validate(await websocket.receive_json())
+        logger.debug(f"Player {request.name} joined session {session_id}")
+
+        async def on_message(sender: str, message: dict[str, Any], ice_type: str):
+            logger.debug(f"Received message from {sender}: {message}")
+            await websocket.send_json(
+                OutgoingIce(
+                    sender=sender,
+                    payload=message,
+                    ice_type=ice_type,
+                ).model_dump()
+            )
+
+        public_key = decode_b64(request.public_key)
+        verifier = Verifier(public_key)
+        player = Player(
+            name=request.name.strip(),
+            public_key=public_key,
+            # First player should be automatically accepted
+            accepted=session.player_count() == 0,
+            websocket=websocket,
+            on_ice_candidate=on_message,
+            verifier=verifier,
+        )
+        session.add_player(player)
+        logger.debug(f"Added player {player} to session")
+        nonce = secrets.token_bytes(32)
+        challenge_nonce = encode_b64(nonce)
+        logger.debug(f"Generated challenge nonce {challenge_nonce}")
+        assert IceServerProvider.instance is not None, (
+            "ICE server provider is not initialized"
+        )
+        await websocket.send_json(
+            SessionInfoMessage(
+                player_keys={
+                    player.name: encode_b64(player.public_key)
+                    for player in session.get_players()
+                    if player.name != request.name
+                },
+                challenge_nonce=challenge_nonce,
+                ice_servers=ice_servers.get_ice_servers(player.name),
+            ).model_dump()
+        )
+        logger.debug(f"Sent session info to {player.name}")
+
+        try:
+            while True:
+                message = await websocket.receive_json()
+                logger.debug(f"Received message from {player.name}: {message}")
+                if message["type"] == "ice":
+                    ice_msg = IncomingIce.model_validate(message)
+                    await session.send_message(
                         request.name,
-                        {
-                            name: decode_b64(value)
-                            for name, value in proof.player_payloads.items()
-                        },
-                        nonce,
+                        ice_msg.recipient,
+                        ice_msg.payload,
+                        ice_msg.ice_type,
                     )
-                except ecdsa.BadSignatureError:
-                    verified = False
-                if verified:
-                    logger.debug(f"Player {request.name} verified")
-                    player.accepted = True
-                else:
-                    logger.debug(f"Player {request.name} failed verification")
-                    player.accepted = False
-                    await websocket.close()
-                    return
-            elif message["type"] == "start":
-                await session.start()
-    except WebSocketDisconnect:
-        session.remove_player(player.name)
-        if session.player_count() == 0:
-            SESSIONS.pop(session.session_id)
+                elif message["type"] == "proof":
+                    proof = ChallengeProofMessage.model_validate(message)
+                    try:
+                        verified = session.verify_proof(
+                            request.name,
+                            {
+                                name: decode_b64(value)
+                                for name, value in proof.player_payloads.items()
+                            },
+                            nonce,
+                        )
+                    except ecdsa.BadSignatureError:
+                        verified = False
+                    if verified:
+                        logger.debug(f"Player {request.name} verified")
+                        player.accepted = True
+                    else:
+                        logger.debug(f"Player {request.name} failed verification")
+                        player.accepted = False
+                        await websocket.close()
+                        return
+                elif message["type"] == "start":
+                    await session.start(signer)
+        except WebSocketDisconnect:
+            session.remove_player(player.name)
+            if session.player_count() == 0:
+                SESSIONS.pop(session.session_id)
+
+    return app

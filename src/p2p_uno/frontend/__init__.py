@@ -1,12 +1,10 @@
 import argparse
 import asyncio
-import os
 
 import pydantic
 import uvicorn
 import yaml
 from fastapi import FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 

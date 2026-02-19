@@ -12,9 +12,13 @@ enum IceType {
 type WebsocketMessage = LobbyEnd | IncomingIce;
 
 interface LobbyEnd {
+    session_handle: string;
+    type: "lobbyend";
+}
+
+interface SessionHandle {
     verified_players: { name: string; key: string }[];
     top_card: CardType;
-    type: "lobbyend";
 }
 
 interface IncomingIce {
@@ -229,11 +233,13 @@ export class ConnectionEstablishHandler {
     private handle_lobby_end(end_msg: LobbyEnd) {
         const result: PlayerConnection[] = [];
 
+        const handle = JSON.parse(end_msg.session_handle) as SessionHandle;
+
         for (const channel of Object.values(this.player_channels)) {
             channel.onmessage = null;
         }
 
-        for (const { name, key } of end_msg.verified_players) {
+        for (const { name, key } of handle.verified_players) {
             result.push({
                 name,
                 data_channel: this.player_channels[name],
@@ -242,7 +248,7 @@ export class ConnectionEstablishHandler {
             });
         }
 
-        this.on_finished({ players: result, top_card: end_msg.top_card });
+        this.on_finished({ players: result, top_card: handle.top_card });
     }
 
     private async on_message(msg: WebsocketMessage) {
