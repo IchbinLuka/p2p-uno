@@ -313,7 +313,7 @@ export class ConnectionEstablishHandler {
         on_session_start: (result: ConnectionResult) => void,
     ): Promise<ConnectionEstablishHandler> {
         console.debug("Opening websocket");
-        const host = await api.hostname;
+        const host = (await api.hostname).split("://")[1];
         const websocket = new WebSocket(`ws://${host}/sessions/${session_id}`);
         // Wait until websocket is open
         await new Promise<void>((resolve, reject) => {
