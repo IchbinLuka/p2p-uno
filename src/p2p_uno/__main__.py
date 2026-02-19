@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from p2p_uno import sessions
-from p2p_uno.sessions import SESSIONS, Session
+from p2p_uno.sessions import Session
 from p2p_uno.signatures import HandleSigner
 from p2p_uno.turn import IceServerProvider, TurnConfig
 from p2p_uno.util import setup_logging
@@ -67,17 +67,6 @@ async def start_server():
         generate_keypair(args)
         return
 
-    for _ in range(args.fill_sessions):
-        max_players = random.randint(3, 10)
-        name = random.choice(["Alice", "Bob", "Charlie", "David", "Eve"])
-        session_id = uuid.uuid4()
-        session = Session(
-            session_id=str(session_id),
-            name=name,
-            max_players=max_players,
-        )
-        SESSIONS[str(session_id)] = session
-
     if args.turn_config:
         with open(args.turn_config, "r") as f:
             turn_config = TurnConfig.model_validate(yaml.load(f, Loader=yaml.Loader))
@@ -98,10 +87,22 @@ async def start_server():
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    sessions_app = sessions.create_app(HandleSigner.load_file(args.key), ice_servers)
+
+    for _ in range(args.fill_sessions):
+        max_players = random.randint(3, 10)
+        name = random.choice(["Alice", "Bob", "Charlie", "David", "Eve"])
+        session_id = uuid.uuid4()
+        session = Session(
+            session_id=str(session_id),
+            name=name,
+            max_players=max_players,
+        )
+        sessions_app.sessions[str(session_id)] = session
 
     app.mount(
         "/sessions",
-        sessions.create_app(HandleSigner.load_file(args.key), ice_servers),
+        sessions_app,
     )
     config = uvicorn.Config(app, host=args.host, port=args.port)
     server = uvicorn.Server(config)

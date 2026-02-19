@@ -1,6 +1,5 @@
 import asyncio
 import itertools
-import json
 import logging
 import random
 import secrets
@@ -121,9 +120,6 @@ class Session:
         )
 
 
-SESSIONS: dict[str, Session] = {}
-
-
 class SessionRepr(pydantic.BaseModel):
     session_id: str
     session_name: str
@@ -168,8 +164,14 @@ class ChallengeProofMessage(pydantic.BaseModel):
     player_payloads: dict[str, str]
 
 
+class SessionsApp(FastAPI):
+    def __init__(self, *args, **kwargs):
+        self.sessions: dict[str, Session] = {}
+        super().__init__(*args, **kwargs)
+
+
 def create_app(signer: HandleSigner, ice_servers: IceServerProvider):
-    app = FastAPI()
+    app = SessionsApp()
 
     @app.post("/")
     async def create_session(body: SessionCreate):
@@ -179,7 +181,7 @@ def create_app(signer: HandleSigner, ice_servers: IceServerProvider):
             name=body.session_name,
             max_players=body.max_players,
         )
-        SESSIONS[str(session_id)] = session
+        app.sessions[str(session_id)] = session
         logger.debug(f"Created session {session_id}")
         return SessionRepr(
             session_id=str(session_id),
@@ -199,21 +201,21 @@ def create_app(signer: HandleSigner, ice_servers: IceServerProvider):
                 max_players=session.max_players,
             )
             for session_id, session in itertools.islice(
-                SESSIONS.items(), skip, skip + limit
+                app.sessions.items(), skip, skip + limit
             )
             if session.player_count() < session.max_players and not session.started
         ]
 
     @app.get("/{session_id}/available")
     async def name_available(name: str, session_id: str):
-        session = SESSIONS.get(session_id)
+        session = app.sessions.get(session_id)
         if session is None:
             raise HTTPException(status_code=404, detail="Session not found")
         return {"available": name.strip() in session.players}
 
     @app.websocket("/{session_id}")
     async def join_session(websocket: WebSocket, session_id: str):
-        session = SESSIONS.get(session_id)
+        session = app.sessions.get(session_id)
         if session is None:
             logger.error(f"Session {session_id} not found")
             await websocket.close(code=1008)
@@ -302,6 +304,6 @@ def create_app(signer: HandleSigner, ice_servers: IceServerProvider):
         except WebSocketDisconnect:
             session.remove_player(player.name)
             if session.player_count() == 0:
-                SESSIONS.pop(session.session_id)
+                app.sessions.pop(session.session_id)
 
     return app
