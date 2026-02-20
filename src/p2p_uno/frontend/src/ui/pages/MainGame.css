@@ -53,6 +53,7 @@
 .player-state-card {
     border-radius: 20px;
     background-color: rgb(61, 82, 92);
+    color: var(--color-dark);
     width: 70px;
     height: 100px;
     place-content: center;

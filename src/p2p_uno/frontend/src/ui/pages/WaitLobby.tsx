@@ -62,7 +62,9 @@ function WaitLobby({
 function ConnectionIndicator({ connected }: { connected: boolean }) {
     // Show either "connected"/"connecting" with a colored circle indicator
     const { t } = useTranslation();
-    const dot_color = connected ? "green" : "red";
+    const dot_color = connected
+        ? "rgba(102, 255, 51, 190)"
+        : "rgba(255, 0, 0, 190)";
     return (
         <div
             style={{
