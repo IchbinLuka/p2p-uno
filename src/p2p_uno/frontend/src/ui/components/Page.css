@@ -1,6 +1,6 @@
 .header {
     width: 100%;
-    border-bottom: 1px solid #dee2e611;
+    border-bottom: 1px solid color-mix(in srgb, var(--color), transparent 80%);
     display: flex;
     flex-direction: row;
     justify-content: space-between;
@@ -34,4 +34,9 @@ a:hover {
 .footer a {
     color: inherit;
     font-weight: normal;
+}
+
+.themeSwitcher {
+    cursor: pointer;
+    margin-inline: 5px;
 }

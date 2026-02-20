@@ -1,14 +1,21 @@
 :root {
-    --background-color: #0d1011;
+    --background-color-dark: #0d1011;
+    --background-color-light: #ffffff;
+    --color-dark: rgba(255, 255, 255, 0.87);
+    --color-light: rgba(0, 0, 0, 0.87);
+
+    --background-color: var(--background-color-dark);
+    --color: var(--color-dark);
+
     font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
     line-height: 1.5;
     font-weight: 400;
 
     width: 100%;
 
-    color-scheme: light dark;
-    color: rgba(255, 255, 255, 0.87);
-    background-color: var(--background-color);
+    /*color-scheme: light dark;
+    color: var(--color);
+    background-color: var(--background-color);*/
 
     font-synthesis: none;
     text-rendering: optimizeLegibility;
@@ -31,6 +38,9 @@ body {
     /*place-items: center;*/
     /*min-width: 320px;*/
     min-height: 100vh;
+    color-scheme: light dark;
+    color: var(--color);
+    background-color: var(--background-color);
 }
 
 h1 {
@@ -57,7 +67,7 @@ button:focus-visible {
     outline: 4px auto -webkit-focus-ring-color;
 }
 
-@media (prefers-color-scheme: light) {
+/*@media (prefers-color-scheme: light) {
     :root {
         color: #213547;
         background-color: #ffffff;
@@ -68,4 +78,4 @@ button:focus-visible {
     button {
         background-color: #f9f9f9;
     }
-}
+}*/

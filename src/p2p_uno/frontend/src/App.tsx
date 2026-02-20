@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import "./App.css";
 import { API } from "./model/api";
 import ServerBrowser from "./ui/pages/ServerBrowser";
@@ -6,15 +6,23 @@ import { APIContext } from "./ui/context";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import CreateSession from "./ui/pages/CreateSession";
 import GameSession, { FinishPage } from "./ui/pages/GameSession";
-import { ConfigProvider, theme } from "antd";
+import { ConfigProvider, theme as antdTheme } from "antd";
 import { GameVisTest } from "./ui/pages/MainGame";
 import Credits from "./ui/pages/Credits";
 import { GameFinished } from "./model/model";
 import LoadingIndicator from "./ui/components/LoadingIndicator";
+import { ThemeContext, ThemeMode } from "./context";
 
 function App() {
     const [api, setApi] = useState<API | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const { theme } = useContext(ThemeContext);
+
+    const algorithm =
+        theme == ThemeMode.DARK
+            ? antdTheme.darkAlgorithm
+            : antdTheme.defaultAlgorithm;
+
     useEffect(() => {
         API.create()
             .then(setApi)
@@ -22,22 +30,18 @@ function App() {
     }, []);
 
     if (error != null) {
-        return (
-            <ConfigProvider theme={{ algorithm: theme.darkAlgorithm }}>
-                Error
-            </ConfigProvider>
-        );
+        return <ConfigProvider theme={{ algorithm }}>Error</ConfigProvider>;
     }
     if (api == null) {
         return (
-            <ConfigProvider theme={{ algorithm: theme.darkAlgorithm }}>
+            <ConfigProvider theme={{ algorithm }}>
                 <LoadingIndicator />
             </ConfigProvider>
         );
     }
 
     return (
-        <ConfigProvider theme={{ algorithm: theme.darkAlgorithm }}>
+        <ConfigProvider theme={{ algorithm }}>
             <APIContext.Provider value={api}>
                 <BrowserRouter>
                     <Routes>
