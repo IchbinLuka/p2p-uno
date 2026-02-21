@@ -175,6 +175,8 @@ def create_app(signer: HandleSigner, ice_servers: IceServerProvider):
 
     @app.post("/")
     async def create_session(body: SessionCreate):
+        if body.max_players < 2 or body.max_players > 12:
+            raise HTTPException(status_code=400, detail="Invalid max_players")
         session_id = uuid.uuid4()
         session = Session(
             session_id=str(session_id),
