@@ -1,15 +1,16 @@
-secret: verysecretsecret
-host: localhost
-ttl: 3000
-endpoints:
-    - port: 3478
-      transport: tcp
-      secure: false
+turn1:
+    secret: verysecretsecret
+    host: localhost
+    ttl: 3000
+    endpoints:
+        - port: 3478
+          transport: tcp
+          secure: false
 
-    - port: 3478
-      transport: udp
-      secure: false
+        - port: 3478
+          transport: udp
+          secure: false
 
-    - port: 5349
-      transport: tcp
-      secure: true
+        - port: 5349
+          transport: tcp
+          secure: true

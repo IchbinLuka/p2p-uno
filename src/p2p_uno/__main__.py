@@ -3,6 +3,7 @@ import asyncio
 import random
 import uuid
 
+import pydantic
 import uvicorn
 import yaml
 from fastapi import FastAPI
@@ -69,7 +70,9 @@ async def start_server():
 
     if args.turn_config:
         with open(args.turn_config, "r") as f:
-            turn_config = TurnConfig.model_validate(yaml.load(f, Loader=yaml.Loader))
+            turn_config = pydantic.TypeAdapter(dict[str, TurnConfig]).validate_python(
+                yaml.load(f, Loader=yaml.Loader)
+            )
     else:
         turn_config = None
     # Initialize provider

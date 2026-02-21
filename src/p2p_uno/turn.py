@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
+import itertools
 import time
 
 import pydantic
@@ -57,16 +58,19 @@ class IceServerProvider:
         IceServer(urls="stun:stun2.l.google.com:19302"),
     ]
 
-    instance: IceServerProvider | None = None
-
-    def __init__(self, turn_config: TurnConfig | None):
-        self.turn_config = turn_config
-        if self.__class__.instance is not None:
-            raise ValueError("IceServerProvider instance already exists")
-        self.__class__.instance = self
+    def __init__(self, turn_configs: dict[str, TurnConfig] | None):
+        self.turn_configs = turn_configs
 
     def get_ice_servers(self, player_name: str) -> list[IceServer]:
         """Get the TURN servers as RTCIceServers."""
-        if self.turn_config is None:
+        if self.turn_configs is None:
             return self.DEFAULT_ICE_SERVERS
-        return self.turn_config.get_ice_servers(player_name)
+        return list(
+            itertools.chain(
+                self.DEFAULT_ICE_SERVERS,
+                *[
+                    turn_config.get_ice_servers(player_name)
+                    for turn_config in self.turn_configs.values()
+                ],
+            )
+        )

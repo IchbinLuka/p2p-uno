@@ -250,9 +250,6 @@ def create_app(signer: HandleSigner, ice_servers: IceServerProvider):
         nonce = secrets.token_bytes(32)
         challenge_nonce = encode_b64(nonce)
         logger.debug(f"Generated challenge nonce {challenge_nonce}")
-        assert IceServerProvider.instance is not None, (
-            "ICE server provider is not initialized"
-        )
         await websocket.send_json(
             SessionInfoMessage(
                 player_keys={
