@@ -91,10 +91,13 @@ export class GameRunning {
                     return {
                         player: p.name,
                         channel: p.data_channel!,
+                        rtc_connection: p.connection!,
+                        sent_offer: p.sent_offer,
                     };
                 }),
             sign_manager,
             players,
+            this.own_name,
         );
 
         this.player_order = connection_result.players.map((p) => p.name);

@@ -3,7 +3,7 @@ import { b64_to_uint8, uint8_to_b64 } from "./serialization";
 import type { SignManager } from "./signing";
 import type { CardType } from "./types";
 
-enum IceType {
+export enum IceType {
     Candidate = "candidate",
     Answer = "answer",
     Offer = "offer",
@@ -21,7 +21,7 @@ interface SessionHandle {
     top_card: CardType;
 }
 
-interface IncomingIce {
+export interface IncomingIce {
     sender: string;
     payload: object;
     ice_type: IceType;
@@ -79,6 +79,7 @@ export interface PlayerConnection {
     data_channel: RTCDataChannel | undefined;
     connection: RTCPeerConnection | undefined;
     public_key: Uint8Array;
+    sent_offer: boolean;
 }
 
 export interface ConnectionResult {
@@ -103,6 +104,8 @@ export interface PlayerStatus {
     player_name: string;
     connected: boolean;
 }
+
+export const COMMUNICATION_CHANNEL_NAME = "game_communication";
 
 export class ConnectionEstablishHandler {
     private player_connections: Record<string, RTCPeerConnection> = {};
@@ -244,6 +247,7 @@ export class ConnectionEstablishHandler {
                 name,
                 data_channel: this.player_channels[name],
                 connection: this.player_connections[name],
+                sent_offer: name in this.player_proofs,
                 public_key: b64_to_uint8(key),
             });
         }
@@ -365,12 +369,8 @@ export class ConnectionEstablishHandler {
             const connection = handler.create_connection(player);
             handler.player_connections[player] = connection;
             const data_channel = connection.createDataChannel(
-                "game_communication",
-                {
-                    ordered: true,
-                    // maxPacketLifeTime: 10_000,
-                    // maxRetransmits: 10_000,
-                },
+                COMMUNICATION_CHANNEL_NAME,
+                { ordered: true },
             );
             handler.handle_data_channel(data_channel, player);
             connection
