@@ -37,6 +37,7 @@
     "credits": {
         "title": "Credits",
         "thanks_for_playing": "Danke fürs Spielen!",
-        "asset_attributions": "Quellenangaben für verwendete Assets"
+        "asset_attributions": "Quellenangaben für verwendete Assets",
+        "contributions_text": "Programmierung und Design von Luka Finn Born"
     }
 }

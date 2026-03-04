@@ -13,6 +13,7 @@ function Credits() {
             <PageTitle>{t("credits.title")}</PageTitle>
             <Typography style={{ flexGrow: 1 }}>
                 <Paragraph>{t("credits.thanks_for_playing")}</Paragraph>
+                <Paragraph>{t("credits.contributions_text")}</Paragraph>
                 <Title level={2}>{t("credits.asset_attributions")}</Title>
                 <Paragraph>
                     Crown by Alejandro from{" "}
