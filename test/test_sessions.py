@@ -73,13 +73,12 @@ def test_name_available_reflects_players():
     data = resp.json()
     session_id = data["session_id"]
 
-    # Name not present initially -> available should be False (implementation returns membership)
     avail = client.get(f"/{session_id}/available", params={"name": "alice"})
     assert avail.status_code == 200
-    assert avail.json() == {"available": False}
+    assert avail.json() == {"available": True}
 
     # Add a player key to the session and check availability again
     app.sessions[session_id].players["alice"] = SimpleNamespace()  # type: ignore
     avail2 = client.get(f"/{session_id}/available", params={"name": "alice"})
     assert avail2.status_code == 200
-    assert avail2.json() == {"available": True}
+    assert avail2.json() == {"available": False}
