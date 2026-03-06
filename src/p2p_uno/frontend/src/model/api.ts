@@ -66,6 +66,20 @@ export class MMServer {
         }
         return (await response.json()) as Session;
     }
+
+    /**
+     * Checks if a name is free or already occupied in a session.
+     * @param name The name to check.
+     * @param session_id The session ID to check against.
+     * @returns True if the name is free, false if it is already occupied.
+     */
+    async nameFree(name: string, session_id: string): Promise<boolean> {
+        const response = await fetch(
+            `${this.httpUrl}/sessions/${session_id}/available?name=${name}`,
+        );
+        const { available } = (await response.json()) as { available: boolean };
+        return available;
+    }
 }
 
 /**

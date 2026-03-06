@@ -16,7 +16,8 @@
         "time_left": "Time left:",
         "your_turn": "It's your turn!",
         "current_card": "Current Card",
-        "no_matchmaking_server_available": "No matchmaking server available"
+        "no_matchmaking_server_available": "No matchmaking server available",
+        "name_taken": "The name {{name}} is already taken"
     },
     "end_screen": {
         "game_over": "Game Over!",

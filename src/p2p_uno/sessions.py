@@ -213,7 +213,7 @@ def create_app(signer: HandleSigner, ice_servers: IceServerProvider):
         session = app.sessions.get(session_id)
         if session is None:
             raise HTTPException(status_code=404, detail="Session not found")
-        return {"available": name.strip() in session.players}
+        return {"available": name.strip() not in session.players}
 
     @app.websocket("/{session_id}")
     async def join_session(websocket: WebSocket, session_id: str):

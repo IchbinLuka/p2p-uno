@@ -16,7 +16,8 @@
         "time_left": "Zeit übrig:",
         "your_turn": "Du bist dran!",
         "current_card": "Aktuelle Karte",
-        "no_matchmaking_server_available": "Kein Matchmaking Server verfügbar"
+        "no_matchmaking_server_available": "Kein Matchmaking Server verfügbar",
+        "name_taken": "Der Name {{name}} ist bereits vergeben"
     },
     "end_screen": {
         "game_over": "Spiel vorbei!",

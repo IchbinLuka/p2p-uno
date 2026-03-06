@@ -1,7 +1,7 @@
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { APIContext } from "../context";
 import type { Session } from "../../model/api";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Button, List, Form, Input, Radio, type RadioChangeEvent } from "antd";
 import Page from "../components/Page";
 import { useTranslation } from "react-i18next";
@@ -29,6 +29,8 @@ function ServerBrowser() {
         queryParams.get("name") ?? "",
     );
 
+    const [error, setError] = useState<string | undefined>();
+
     function onServerChange(e: RadioChangeEvent | string) {
         console.log("onServerChange");
         skipRef.current = 0;
@@ -36,6 +38,20 @@ function ServerBrowser() {
         setSessions(null);
         setReachedEnd(false);
         // loadMoreSessions();
+    }
+
+    const navigate = useNavigate();
+
+    async function joinSession(id: string) {
+        const nameAvailable = await api.mm_servers[server].nameFree(
+            playerName,
+            id,
+        );
+        if (!nameAvailable) {
+            setError(t("session.name_taken", { name: playerName }));
+            return;
+        }
+        await navigate(`/session/${server}/${id}?name=${playerName}`);
     }
 
     const loadMoreSessions = useCallback(() => {
@@ -105,6 +121,7 @@ function ServerBrowser() {
                     <PageTitle>{t("session.open")}</PageTitle>
                 </div>
                 {/*<h1 style={{ marginBottom: 60 }}>{t("session.open")}</h1>*/}
+                {error && <div style={{ color: "red" }}>{error}</div>}
                 <div style={{ width: 500 }}>
                     <Form
                         layout="inline"
@@ -199,16 +216,17 @@ function ServerBrowser() {
                                             player_count: `${item.player_count}/${item.max_players}`,
                                         })}
                                     </h3>
-                                    <Link
-                                        to={`/session/${server}/${item.session_id}?name=${playerName}`}
+                                    <Button
+                                        type="default"
+                                        disabled={!playerName}
+                                        onClick={() => {
+                                            joinSession(item.session_id).catch(
+                                                (e) => console.error(e),
+                                            );
+                                        }}
                                     >
-                                        <Button
-                                            type="default"
-                                            disabled={!playerName}
-                                        >
-                                            {t("session.join")}
-                                        </Button>
-                                    </Link>
+                                        {t("session.join")}
+                                    </Button>
                                 </div>
                             </List.Item>
                         )}
