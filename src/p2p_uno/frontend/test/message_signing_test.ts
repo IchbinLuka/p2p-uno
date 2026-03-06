@@ -1,12 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { SignManager } from "../src/model/signing";
+import { SignManagerImpl } from "../src/model/signing";
 import type { PlayerGame } from "../src/model/types";
 import { MessageType, type KickVote } from "../src/model/connection";
 
 describe("signing & verifying card", () => {
     it("", async () => {
-        const manager1 = await SignManager.init();
-        const manager2 = await SignManager.init();
+        const manager1 = await SignManagerImpl.init();
+        const manager2 = await SignManagerImpl.init();
 
         const players: { [key: string]: PlayerGame } = {
             bob: {

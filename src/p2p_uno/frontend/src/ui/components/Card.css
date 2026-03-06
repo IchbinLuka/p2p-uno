@@ -29,9 +29,6 @@
         0 10px 20px rgba(0, 0, 0, 0.2),
         0 0 15px rgba(var(--card-accent-rgb, 255, 204, 0), 0.75);
 
-    /* if you want to avoid rgb helpers, fallback to a single semi-transparent ring */
-    /* box-shadow: 0 10px 30px rgba(0,0,0,0.2), 0 0 24px rgba(255,204,0,0.75); */
-
     outline-color: #ffcc00;
 }
 .card-number {

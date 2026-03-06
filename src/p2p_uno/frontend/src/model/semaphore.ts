@@ -1,4 +1,7 @@
 // Thanks to https://medium.com/@artemkhrenov/advanced-concurrency-patterns-in-javascript-semaphore-mutex-read-write-lock-deadlock-prevention-79e8bffb5b81
+/**
+ * Implementation of a simple Semaphore using js promises.
+ */
 export class Semaphore {
     private current: number;
     private maxConcurrent: number;
@@ -10,6 +13,10 @@ export class Semaphore {
         this.queue = [];
     }
 
+    /**
+     * Acquires a semaphore slot, waiting if necessary.
+     * @returns A promise that resolves when the semaphore is acquired.
+     */
     async acquire() {
         if (this.current < this.maxConcurrent) {
             this.current++;
@@ -21,6 +28,9 @@ export class Semaphore {
         });
     }
 
+    /**
+     * Releases a semaphore slot, waking up a waiting acquire if necessary.
+     */
     release() {
         this.current--;
 
@@ -31,7 +41,12 @@ export class Semaphore {
         }
     }
 
-    async with<T>(fn: () => Promise<T>): Promise<T> {
+    /**
+     * Helper method to execute a function with the semaphore acquired.
+     * @param fn The function to execute.
+     * @returns The result of the function.
+     */
+    async with<T>(fn: () => T): Promise<T> {
         await this.acquire();
         try {
             return fn();

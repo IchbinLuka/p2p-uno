@@ -24,9 +24,9 @@ import {
     type ConnectionResult,
     type PlayerStatus,
 } from "./ice_messaging";
-import { SignManager } from "./signing";
+import { SignManagerImpl, type SignManager } from "./signing";
 import type { CardType, KnownCard, PlayerGame } from "./types";
-import { ValueNotifier } from "./util";
+import { ValueNotifier } from "./value_notifier";
 
 export interface UICard {
     card_type: CardType;
@@ -105,7 +105,6 @@ export class GameRunning {
         this.game_manager = new GameManager(
             sign_manager,
             this.player_order,
-            (_) => {},
             players,
             connection_result.top_card,
         );
@@ -368,7 +367,7 @@ export class GameModel {
     }
 
     static async create(server: MMServer) {
-        const sign_manager = await SignManager.init();
+        const sign_manager = await SignManagerImpl.init();
         return new GameModel(sign_manager, server);
     }
 

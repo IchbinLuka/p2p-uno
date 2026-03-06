@@ -157,7 +157,7 @@ export class PlayerTimeout {
 
 /**
  * Class which manages the game flow. This class essentially acts a bit like a server
- * and does not differentiate between the own player and other players.
+ * and does not differentiate between the player themself and other players.
  */
 export class GameManager {
     private phase: GamePhase;
@@ -172,7 +172,6 @@ export class GameManager {
     constructor(
         sign_manager: SignManager,
         player_order: string[],
-        on_violation: (violation: PlayerError) => void,
         players: Record<string, PlayerGame>,
         top_card: CardType,
     ) {
@@ -181,7 +180,6 @@ export class GameManager {
         this.phase = new Preparing(0);
         this.player_order = player_order;
         this.top_card = top_card;
-        this.on_violation = on_violation;
     }
 
     add_phase_listener(listener: (phase: GamePhase) => void) {
@@ -192,8 +190,6 @@ export class GameManager {
     remove_phase_listener(listener: (phase: GamePhase) => void) {
         this.phase_listeners.delete(listener);
     }
-
-    on_violation(_violation: PlayerError) {}
 
     update_phase(new_phase: GamePhase) {
         this.phase = new_phase;
@@ -283,7 +279,6 @@ export class GameManager {
                     this.players,
                 ))
             ) {
-                this.on_violation(new InvalidSignature(message.player));
                 throw new InvalidAction(
                     `Card signature verification failed`,
                     message.player,

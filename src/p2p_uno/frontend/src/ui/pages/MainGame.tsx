@@ -117,7 +117,6 @@ function GameVis({
             const maxOverlap = cardRect.width * 0.9; // never overlap more than 90% of card width
             if (overlapPerGap > maxOverlap) overlapPerGap = maxOverlap;
 
-            // Ensure non-negative
             overlapPerGap = Math.max(-10, overlapPerGap);
 
             setOverlap(overlapPerGap);
@@ -155,7 +154,6 @@ function GameVis({
 
     // Inline style to set the CSS variable on the card-bar
     const barStyle: React.CSSProperties & { [key: string]: string } = {
-        // Set the CSS variable --card-overlap in pixels
         ["--card-overlap"]: `${-overlap}px`,
     };
 

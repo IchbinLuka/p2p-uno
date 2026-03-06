@@ -11,6 +11,9 @@ export interface Session {
     max_players: number;
 }
 
+/**
+ * API wrapper for matchmaking server instances.
+ */
 export class MMServer {
     readonly config: MMServerConfig;
 
@@ -18,14 +21,22 @@ export class MMServer {
         this.config = config;
     }
 
+    /** Returns the WebSocket URL for the server. */
     get wsUrl(): string {
         return `${this.config.secure ? "wss" : "ws"}://${this.config.url}`;
     }
 
+    /** Returns the HTTP URL for the server. */
     get httpUrl(): string {
         return `${this.config.secure ? "https" : "http"}://${this.config.url}`;
     }
 
+    /**
+     * Fetches a list of sessions from the server.
+     * @param skip Number of sessions to skip.
+     * @param limit Number of sessions to return.
+     * @returns The list of sessions.
+     */
     async fetchSessions(skip: number, limit: number): Promise<Session[]> {
         const response = await fetch(
             `${this.httpUrl}/sessions?skip=${skip}&limit=${limit}`,
@@ -36,6 +47,12 @@ export class MMServer {
         return (await response.json()) as Session[];
     }
 
+    /**
+     * Creates a new session on the server.
+     * @param name The name of the session.
+     * @param max_players The maximum number of players in the session.
+     * @returns The created session.
+     */
     async createSession(name: string, max_players: number): Promise<Session> {
         const response = await fetch(`${this.httpUrl}/sessions`, {
             method: "POST",
@@ -51,13 +68,23 @@ export class MMServer {
     }
 }
 
+/**
+ * API wrapper that encapsulates access to the MM servers.
+ */
 export class API {
+    /**
+     * The MM servers available for use.
+     */
     readonly mm_servers: Record<string, MMServer>;
 
     private constructor(mm_servers: Record<string, MMServer>) {
         this.mm_servers = mm_servers;
     }
 
+    /**
+     * Creates a new API instance.
+     * @returns The created API instance.
+     */
     static async create() {
         let mm_servers: Record<string, MMServer>;
         if (import.meta.env.DEV) {

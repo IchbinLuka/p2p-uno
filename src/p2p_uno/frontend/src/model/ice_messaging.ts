@@ -107,6 +107,9 @@ export interface PlayerStatus {
 
 export const COMMUNICATION_CHANNEL_NAME = "game_communication";
 
+/**
+ * This class implements the functionality for establishing the Peer-to-peer connections.
+ */
 export class ConnectionEstablishHandler {
     private player_connections: Record<string, RTCPeerConnection> = {};
     private player_channels: Record<string, RTCDataChannel> = {};

@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import type { ValueListenable } from "../model/util";
+import type { ValueListenable } from "../model/value_notifier";
 import { useSearchParams } from "react-router-dom";
 
 export function useValueListenable<T>(

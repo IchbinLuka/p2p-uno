@@ -1,5 +1,4 @@
 import { AsyncQueue } from "./async_queue";
-import { PlayerError } from "./errors";
 import {
     COMMUNICATION_CHANNEL_NAME,
     IceType,
@@ -9,21 +8,6 @@ import { Semaphore } from "./semaphore";
 import { deserialize_message, serialize_message } from "./serialization";
 import type { SignManager } from "./signing";
 import type { Card, KnownCard, PlayerGame } from "./types";
-
-export class UnexpectedMessageType extends PlayerError {
-    expected: MessageType[];
-    actual: MessageType;
-
-    constructor(expected: MessageType[], actual: MessageType, player: string) {
-        super(player);
-        this.expected = expected;
-        this.actual = actual;
-    }
-
-    toString() {
-        return `Unexpected Message Type: ${this.actual}. Expected one of ${JSON.stringify(this.expected)}`;
-    }
-}
 
 export enum MessageType {
     SIGN_CARD = "sign_card",
@@ -84,30 +68,6 @@ export interface KickVote {
     type: MessageType.KICK_VOTE;
     player: string;
     reason: string;
-}
-
-export type KickListener = (
-    violation: string,
-    author: string,
-    target: string,
-) => void;
-
-export type MessageRequestListener = () => Promise<void>;
-
-export interface ConnectionManager {
-    await_message(player_name: string, types: MessageType[]): Promise<Message>;
-    add_kick_vote_listener(listener: KickListener): void;
-    manual_send(message: PlayerMessage): void;
-    add_manual_message_resolver(
-        player_name: string,
-        message_type: MessageType,
-        listener: MessageRequestListener,
-    ): void;
-    remove_manual_message_resolver(
-        player_name: string,
-        message_type: MessageType,
-        listener: MessageRequestListener,
-    ): void;
 }
 
 export interface PlayerMessage {

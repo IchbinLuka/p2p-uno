@@ -4,12 +4,6 @@
  * This provides a simple observable wrapper around a value. Consumers can
  * register listeners that will be notified whenever the value changes.
  *
- * Differences from Flutter:
- * - Listener signature is `(value?: T) => void` and listeners are called with
- *   the new value. Passing the value is a convenience for JavaScript/TypeScript.
- * - Add/remove listener semantics follow function reference equality.
- * - Equality check for value changes uses strict equality (`!==`).
- *
  * Usage:
  *   const counter = new ValueNotifier<number>(0);
  *   const listener = (v?: number) => console.log('value changed to', v);
@@ -56,8 +50,7 @@ export class ValueNotifier<T> implements ValueListenable<T> {
     }
 
     /**
-     * Current value. Setting this will notify listeners if the value changes
-     * (using strict inequality).
+     * Current value. Setting this will notify listeners if the value changes.
      */
     public get value(): T {
         return this._value;
@@ -65,7 +58,7 @@ export class ValueNotifier<T> implements ValueListenable<T> {
 
     public set value(newValue: T) {
         this._throwIfDisposed();
-        // Only notify when the value actually changes (strict comparison).
+        // Only notify when the value actually changes.
         if (newValue !== this._value) {
             this._value = newValue;
             this.notifyListeners();
@@ -99,10 +92,10 @@ export class ValueNotifier<T> implements ValueListenable<T> {
         for (const l of this.listeners) {
             try {
                 l(this._value);
-            } catch {
+            } catch (e) {
                 // Swallow listener errors so one failing listener doesn't prevent
-                // others from receiving updates. In a larger system you might log.
-                // Keep silent here to avoid pulling in logging dependencies.
+                // others from receiving updates.
+                console.error(e);
             }
         }
     }
