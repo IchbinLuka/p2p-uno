@@ -1,6 +1,33 @@
 # P2P Uno
 
-This repository contains the source code for the project in Distributed Systems at Unibo.
+A peer-to-peer clone of the popular UNO game implementing a custom cryptographic protocol to avoid cheating.
+It implemented using TypeScript + React. The P2P communication is done via WebRTc Datachannels.
+
+<p align="center">
+    <img src="figures/screenshot.png" width="600" />
+</p>
+
+## Cryptographic Protocol
+
+### Card Drawing
+
+Assume we have three players: Bob, Alice and Eeve. Bob wants to draw a card.
+
+- Bob generates a random nonce using a secure random generator
+- Bob sends the nonce to Alice and Eeve
+- Alice signs the nonce and sends the signature to Bob and Eeve
+- Eeve signs the signature of Alice and distributes the result among the other players
+- Finally bob signs Eeves signature but only publishes a hash of their signature for now. This final signature is used to determine the type of the card that has been drawn
+
+![Card Drawing Algorithm](figures/card_drawing.svg)
+
+## Playing Cards
+
+When playing a card, the player now simply publishes the last signature of the signature chain. This allows the other players to verify that:
+
+- The final signature is valid.
+- The card matches the previously published hash.
+- It is allowed to play the card in the current state.
 
 ## Getting started
 
